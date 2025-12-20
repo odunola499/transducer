@@ -5,8 +5,8 @@ from huggingface_hub import hf_hub_download
 from torch import Tensor, nn
 
 from transducer.commons import Encoder
-from transducer.config import Wav2Vec2BertConfig
-from transducer.models.attention import ATTN_FUNCTIONS
+from transducer.models.config import Wav2Vec2BertConfig
+from transducer.models.modules.attention import ATTN_FUNCTIONS
 
 
 def _get_activation(name: str):

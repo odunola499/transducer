@@ -4,7 +4,7 @@ import torch
 from torch import Tensor, nn
 
 from transducer.commons import Joiner, Predictor
-from transducer.config import DecoderConfig
+from transducer.models.config import DecoderConfig
 
 
 class RNNTClassicPredictor(Predictor):

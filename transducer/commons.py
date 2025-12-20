@@ -2,6 +2,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from torch import Tensor, nn
+from pydantic import BaseModel
+
+class Args(BaseModel):
+    def to_dict(self):
+        return self.model_dump()
+    def to_json(self):
+        return self.model_dump_json()
 
 
 @dataclass
