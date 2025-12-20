@@ -1,7 +1,8 @@
-import torch
-from torch.nn import functional as F
-from torch import nn
 from typing import Optional
+
+import torch
+from torch import nn
+from torch.nn import functional as F
 from torch.nn.attention import SDPBackend
 
 
@@ -21,6 +22,7 @@ def _flash_status(
         return False, "flash kernel not available for input dtype/shape; using fallback"
     return True, ""
 
+
 def eager_attention_forward(
     module: nn.Module,
     query: torch.Tensor,
@@ -30,8 +32,6 @@ def eager_attention_forward(
     scaling: float,
     dropout: float = 0.0,
 ):
-    
-
     attn_weights = torch.matmul(query, key.transpose(2, 3)) * scaling
     if attention_mask is not None:
         mask = attention_mask[:, :, :, : key.shape[-2]]
@@ -43,6 +43,7 @@ def eager_attention_forward(
     attn_output = attn_output.transpose(1, 2).contiguous()
 
     return attn_output, attn_weights
+
 
 def sdpa_attention_forward(
     module: nn.Module,
@@ -88,10 +89,11 @@ def flash_attention_forward(
     attn_output = attn_output.transpose(1, 2).contiguous()
     return attn_output, None
 
+
 ATTN_FUNCTIONS = {
-    'flash_attn': flash_attention_forward,
-    'sdpa': sdpa_attention_forward,
-    'eager': eager_attention_forward
+    "flash_attn": flash_attention_forward,
+    "sdpa": sdpa_attention_forward,
+    "eager": eager_attention_forward,
 }
 
 if __name__ == "__main__":
@@ -101,9 +103,9 @@ if __name__ == "__main__":
 
     batch_size = query.shape[0]
     seq_len = query.shape[-2]
-    causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=query.device))[None, None, :, :].expand(
-        batch_size, 1, seq_len, seq_len
-    )
+    causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=query.device))[
+        None, None, :, :
+    ].expand(batch_size, 1, seq_len, seq_len)
     causal_mask = (1.0 - causal_mask) * torch.finfo(torch.float).min
 
     module = nn.Module()

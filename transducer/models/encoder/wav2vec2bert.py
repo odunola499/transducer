@@ -6,7 +6,7 @@ from torch import Tensor, nn
 
 from transducer.commons import Encoder
 from transducer.config import Wav2Vec2BertConfig
-from transducer.model.modules.attention import ATTN_FUNCTIONS
+from transducer.models.attention import ATTN_FUNCTIONS
 
 
 def _get_activation(name: str):
@@ -22,7 +22,9 @@ def _get_activation(name: str):
 class Wav2Vec2BertFeatureProjection(nn.Module):
     def __init__(self, config: Wav2Vec2BertConfig):
         super().__init__()
-        self.layer_norm = nn.LayerNorm(config.feature_projection_input_dim, eps=config.layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(
+            config.feature_projection_input_dim, eps=config.layer_norm_eps
+        )
         self.projection = nn.Linear(config.feature_projection_input_dim, config.hidden_size)
         self.dropout = nn.Dropout(config.feat_proj_dropout)
 
@@ -39,15 +41,16 @@ class Wav2Vec2BertAttention(nn.Module):
         self.embed_dim = config.hidden_size
         self.num_heads = config.num_attention_heads
         self.head_dim = self.embed_dim // self.num_heads
-        self.scaling = self.head_dim ** -0.5
+        self.scaling = self.head_dim**-0.5
         self.qkv_proj = nn.Linear(self.embed_dim, 3 * self.embed_dim)
         self.linear_out = nn.Linear(self.embed_dim, self.embed_dim)
         self.dropout = config.attention_dropout
         self.config = config
 
-        num_positions = config.left_max_position_embeddings + config.right_max_position_embeddings + 1
+        num_positions = (
+            config.left_max_position_embeddings + config.right_max_position_embeddings + 1
+        )
         self.distance_embedding = nn.Embedding(num_positions, self.head_dim)
-
 
     def forward(self, hidden_states: Tensor, attention_mask: Optional[Tensor] = None):
         bsz, seq_len, _ = hidden_states.shape
@@ -115,7 +118,9 @@ class Wav2Vec2BertConvolutionModule(nn.Module):
     def __init__(self, config: Wav2Vec2BertConfig):
         super().__init__()
         if (config.conv_depthwise_kernel_size - 1) % 2 == 1:
-            raise ValueError("`conv_depthwise_kernel_size` should be an odd number for 'SAME' padding")
+            raise ValueError(
+                "`conv_depthwise_kernel_size` should be an odd number for 'SAME' padding"
+            )
 
         self.layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.pointwise_conv1 = nn.Conv1d(
@@ -201,7 +206,9 @@ class Wav2Vec2BertEncoderLayer(nn.Module):
         residual = hidden_states
 
         hidden_states = self.self_attn_layer_norm(hidden_states)
-        hidden_states, _ = self.self_attn(hidden_states=hidden_states, attention_mask=attention_mask)
+        hidden_states, _ = self.self_attn(
+            hidden_states=hidden_states, attention_mask=attention_mask
+        )
         hidden_states = self.self_attn_dropout(hidden_states)
         hidden_states = hidden_states + residual
 
@@ -222,14 +229,16 @@ class Wav2Vec2BertEncoder(nn.Module):
         super().__init__()
         self.config = config
         self.dropout = nn.Dropout(config.hidden_dropout)
-        self.layers = nn.ModuleList([Wav2Vec2BertEncoderLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layers = nn.ModuleList(
+            [Wav2Vec2BertEncoderLayer(config) for _ in range(config.num_hidden_layers)]
+        )
 
     def forward(self, hidden_states: Tensor, attention_mask: Optional[Tensor] = None):
         conv_attention_mask = attention_mask
         additive_mask = None
         if attention_mask is not None:
             hidden_states = hidden_states.masked_fill(~attention_mask.bool().unsqueeze(-1), 0.0)
-            additive_mask = (1.0 - attention_mask[:, None, None, :].to(hidden_states.dtype))
+            additive_mask = 1.0 - attention_mask[:, None, None, :].to(hidden_states.dtype)
             additive_mask = additive_mask * torch.finfo(hidden_states.dtype).min
 
         hidden_states = self.dropout(hidden_states)
@@ -243,7 +252,9 @@ class Wav2Vec2BertEncoder(nn.Module):
         return hidden_states
 
 
-def _compute_mask_indices(shape: tuple[int, int], mask_prob: float, mask_length: int, min_masks: int = 0):
+def _compute_mask_indices(
+    shape: tuple[int, int], mask_prob: float, mask_length: int, min_masks: int = 0
+):
     batch_size, seq_length = shape
     if mask_length < 1 or mask_length > seq_length:
         raise ValueError("Invalid mask_length for mask computation.")
@@ -271,7 +282,10 @@ class Wav2Vec2BertModel(Encoder):
         self.encoder = Wav2Vec2BertEncoder(config)
 
     def _mask_hidden_states(
-        self, hidden_states: Tensor, attention_mask: Optional[Tensor] = None, mask_time_indices: Optional[Tensor] = None
+        self,
+        hidden_states: Tensor,
+        attention_mask: Optional[Tensor] = None,
+        mask_time_indices: Optional[Tensor] = None,
     ):
         if not getattr(self.config, "apply_spec_augment", True):
             return hidden_states
@@ -306,7 +320,9 @@ class Wav2Vec2BertModel(Encoder):
         hidden_states = self.encoder(hidden_states, attention_mask=attention_mask)
         return hidden_states
 
-    def _load_hf_weights(self, load_into_params: bool = True, repo_id: str = "facebook/w2v-bert-2.0"):
+    def _load_hf_weights(
+        self, load_into_params: bool = True, repo_id: str = "facebook/w2v-bert-2.0"
+    ):
         local_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
         weights = torch.load(local_path, map_location="cpu")
         weights = remap_hf_state_dict_wav2vec2bert(weights)
@@ -373,6 +389,7 @@ if __name__ == "__main__":
     print(f"output shape: {out.shape}")
 
     from transformers import Wav2Vec2BertModel as HFWav2Vec2BertModel
+
     hf_model = HFWav2Vec2BertModel.from_pretrained("facebook/w2v-bert-2.0")
     hf_model.eval()
     state_dict = remap_hf_state_dict_wav2vec2bert(hf_model.state_dict())

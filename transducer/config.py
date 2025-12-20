@@ -4,7 +4,6 @@ from typing import Literal
 
 @dataclass
 class EncoderConfig:
-
     attn_impl: Literal["flash_attn", "sdpa", "math"] = "sdpa"
 
     @property
@@ -57,6 +56,7 @@ class Wav2VecLargeConfig(Wav2VecSmallConfig):
     proj_codevector_dim: int = 768
     vocab_size: int = 32
 
+
 Wav2VecConfig = Wav2VecSmallConfig | Wav2VecLargeConfig
 
 
@@ -94,7 +94,7 @@ class DecoderConfig:
     embed_dim: int
     hidden_dim: int
     pred_dim: int
-    joint_dim:int
+    joint_dim: int
     num_layers: int
     dropout: int
     blank_id: int

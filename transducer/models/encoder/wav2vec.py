@@ -1,9 +1,11 @@
 import torch
-from torch import Tensor, nn
-from transducer.config import Wav2VecConfig, Wav2VecSmallConfig, Wav2VecLargeConfig
-from transducer.model.modules.attention import ATTN_FUNCTIONS
 from huggingface_hub import hf_hub_download
+from torch import Tensor, nn
+
 from transducer.commons import Encoder
+from transducer.config import Wav2VecConfig, Wav2VecLargeConfig, Wav2VecSmallConfig
+from transducer.models.attention import ATTN_FUNCTIONS
+
 
 def remap_hf_state_dict(state_dict):
     remapped = {}
@@ -46,13 +48,13 @@ class NormConv(nn.Module):
         self.conv = nn.Conv1d(
             self.in_conv_dim,
             self.out_conv_dim,
-            kernel_size = config.conv_kernel[layer_id],
-            stride = config.conv_stride[layer_id],
-            bias = config.conv_bias
+            kernel_size=config.conv_kernel[layer_id],
+            stride=config.conv_stride[layer_id],
+            bias=config.conv_bias,
         )
         self.activation = nn.GELU()
 
-    def forward(self, hidden_states:Tensor):
+    def forward(self, hidden_states: Tensor):
         hidden_states = self.conv(hidden_states)
         hidden_states = self.activation(hidden_states)
         return hidden_states
@@ -73,7 +75,9 @@ class GroupNormConv(nn.Module):
         )
 
         self.activation = nn.GELU()
-        self.layer_norm = nn.GroupNorm(num_groups=self.out_conv_dim, num_channels=self.out_conv_dim, affine = True)
+        self.layer_norm = nn.GroupNorm(
+            num_groups=self.out_conv_dim, num_channels=self.out_conv_dim, affine=True
+        )
 
     def forward(self, hidden_states):
         hidden_states = self.conv(hidden_states)
@@ -89,27 +93,28 @@ class PositionalConvEmbedding(nn.Module):
             config.hidden_size,
             config.hidden_size,
             kernel_size=config.num_conv_pos_embeddings,
-            padding = config.num_conv_pos_embeddings // 2,
-            groups = config.num_conv_pos_embedding_groups
+            padding=config.num_conv_pos_embeddings // 2,
+            groups=config.num_conv_pos_embedding_groups,
         )
         weight_norm = nn.utils.parametrizations.weight_norm
-        self.conv = weight_norm(self.conv, name = 'weight', dim = 2)
+        self.conv = weight_norm(self.conv, name="weight", dim=2)
         self.activation = nn.GELU()
 
     def forward(self, hidden_states):
         hidden_states = hidden_states.transpose(1, 2)
 
-        hidden_states = self.conv(hidden_states)[:, :,:-1]
+        hidden_states = self.conv(hidden_states)[:, :, :-1]
         hidden_states = self.activation(hidden_states)
 
         hidden_states = hidden_states.transpose(1, 2)
         return hidden_states
 
+
 class FeatureEncoder(nn.Module):
     def __init__(self, config: Wav2VecConfig):
         super().__init__()
         conv_layers = [GroupNormConv(config, 0)] + [
-            NormConv(config, i + 1) for i in range(0, config.num_feat_extract_layers -1)
+            NormConv(config, i + 1) for i in range(0, config.num_feat_extract_layers - 1)
         ]
         self.conv_layers = nn.ModuleList(conv_layers)
 
@@ -117,7 +122,7 @@ class FeatureEncoder(nn.Module):
         for param in self.parameters():
             param.requires_grad_(False)
 
-    def forward(self, input_values:Tensor):
+    def forward(self, input_values: Tensor):
         hidden_states = input_values[:, None]
 
         if self.training:
@@ -128,23 +133,25 @@ class FeatureEncoder(nn.Module):
 
         return hidden_states
 
+
 class FeatureProjection(nn.Module):
     def __init__(self, config: Wav2VecConfig):
         super().__init__()
-        self.layer_norm = nn.LayerNorm(config.conv_dim[-1], eps = config.layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(config.conv_dim[-1], eps=config.layer_norm_eps)
         self.projection = nn.Linear(config.conv_dim[-1], config.hidden_size)
         self.dropout = nn.Dropout(config.feat_proj_dropout)
 
-    def forward(self, hidden_states:Tensor):
+    def forward(self, hidden_states: Tensor):
         norm_hidden_states = self.layer_norm(hidden_states)
         hidden_states = self.projection(norm_hidden_states)
         hidden_states = self.dropout(hidden_states)
         return hidden_states, norm_hidden_states
 
+
 class Attention(nn.Module):
     def __init__(
-            self,
-            config: Wav2VecConfig,
+        self,
+        config: Wav2VecConfig,
     ):
         super().__init__()
         self.embed_dim = config.hidden_size
@@ -153,13 +160,13 @@ class Attention(nn.Module):
         self.head_dim = config.hidden_size // config.num_attention_heads
         self.config = config
 
-        self.scaling= self.head_dim ** -0.5
+        self.scaling = self.head_dim**-0.5
         self.qkv_proj = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=True)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
 
     def forward(
-            self,
-            hidden_states:Tensor,
+        self,
+        hidden_states: Tensor,
     ):
         bsz, seq_len = hidden_states.shape[:-1]
         qkv = self.qkv_proj(hidden_states)
@@ -170,16 +177,17 @@ class Attention(nn.Module):
         attn_output, attn_weights = attention_function(
             self,
             query=query_state,
-            key = key_state,
-            value = value_state,
-            attention_mask = None,
+            key=key_state,
+            value=value_state,
+            attention_mask=None,
             scaling=self.scaling,
-            dropout = 0.0 if not self.training else self.dropout
+            dropout=0.0 if not self.training else self.dropout,
         )
 
         attn_output = attn_output.reshape(bsz, seq_len, -1).contiguous()
         attn_output = self.out_proj(attn_output)
         return attn_output, attn_weights, None
+
 
 class FeedForward(nn.Module):
     def __init__(self, config: Wav2VecConfig):
@@ -200,6 +208,7 @@ class FeedForward(nn.Module):
         hidden_states = self.output_dropout(hidden_states)
         return hidden_states
 
+
 class EncoderLayer(nn.Module):
     def __init__(self, config: Wav2VecConfig):
         super().__init__()
@@ -211,9 +220,7 @@ class EncoderLayer(nn.Module):
 
     def forward(self, hidden_states):
         attn_residual = hidden_states
-        hidden_states, attn_weights, _ = self.attention(
-            hidden_states
-        )
+        hidden_states, attn_weights, _ = self.attention(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = attn_residual + hidden_states
 
@@ -238,7 +245,7 @@ class Wav2VecModel(Encoder):
     def freeze_feature_encoder(self):
         self.feature_extractor._freeze_parameters()
 
-    def forward(self, input_values:Tensor):
+    def forward(self, input_values: Tensor):
         hidden_states = self.feature_extractor(input_values)
         hidden_states = hidden_states.transpose(1, 2)
         hidden_states, _ = self.feature_projection(hidden_states)
@@ -249,20 +256,17 @@ class Wav2VecModel(Encoder):
             hidden_states = encoder_layer(hidden_states)
         return hidden_states
 
-    def _load_hf_weights(self, load_into_params = True):
+    def _load_hf_weights(self, load_into_params=True):
         if isinstance(self.config, Wav2VecSmallConfig):
-            hf_repo = 'facebook/wav2vec2-base'
+            hf_repo = "facebook/wav2vec2-base"
 
         elif isinstance(self.config, Wav2VecLargeConfig):
-            hf_repo = 'facebook/wav2vec2-large'
+            hf_repo = "facebook/wav2vec2-large"
 
         else:
             raise AttributeError("Unknown Config class")
 
-        local_path = hf_hub_download(
-            repo_id = hf_repo,
-            filename = 'pytorch_model.bin'
-        )
+        local_path = hf_hub_download(repo_id=hf_repo, filename="pytorch_model.bin")
         weights = torch.load(local_path, map_location="cpu")
         weights = remap_hf_state_dict(weights)
         if load_into_params:
@@ -270,11 +274,9 @@ class Wav2VecModel(Encoder):
         return weights
 
 
-
-
-
-
-def spec_augment(hidden_states, time_mask_prob=0.05, time_mask_width=10, freq_mask_prob=0.05, freq_mask_width=10):
+def spec_augment(
+    hidden_states, time_mask_prob=0.05, time_mask_width=10, freq_mask_prob=0.05, freq_mask_width=10
+):
     batch, seq, feat = hidden_states.shape
     device = hidden_states.device
     time_mask_width = max(int(time_mask_width), 1)
@@ -284,14 +286,14 @@ def spec_augment(hidden_states, time_mask_prob=0.05, time_mask_width=10, freq_ma
     for b in range(batch):
         for _ in range(num_time_masks):
             start = torch.randint(0, max(seq - time_mask_width, 1), (1,), device=device).item()
-            hidden_states[b, start:start + time_mask_width] = 0
+            hidden_states[b, start : start + time_mask_width] = 0
         for _ in range(num_freq_masks):
             start = torch.randint(0, max(feat - freq_mask_width, 1), (1,), device=device).item()
-            hidden_states[b, :, start:start + freq_mask_width] = 0
+            hidden_states[b, :, start : start + freq_mask_width] = 0
     return hidden_states
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     config = Wav2VecSmallConfig()
     model = Wav2VecModel(config)
     model.eval()
@@ -315,17 +317,23 @@ if __name__ == '__main__':
         ref = hf_model(tensor).last_hidden_state
         print(torch.max(torch.abs(out - ref)))
 
-        feat_extract_output = model.feature_extractor(tensor).transpose(1,2)
-        hf_feat_extract_output = hf_model.feature_extractor(tensor).transpose(1,2)
+        feat_extract_output = model.feature_extractor(tensor).transpose(1, 2)
+        hf_feat_extract_output = hf_model.feature_extractor(tensor).transpose(1, 2)
 
         feat_project = model.feature_projection(feat_extract_output)
         hf_feat_project = hf_model.feature_projection(hf_feat_extract_output)
 
         print(torch.max(torch.abs(feat_extract_output - hf_feat_extract_output)))
-        print(torch.max(torch.abs(feat_project[0]- hf_feat_project[0])))
+        print(torch.max(torch.abs(feat_project[0] - hf_feat_project[0])))
 
-        pre_block = model.dropout(model.layer_norm(feat_project[0] + model.pos_conv_embed(feat_project[0])))
-        hf_pre_block= hf_model.encoder.dropout(hf_model.encoder.layer_norm(hf_feat_project[0] + hf_model.encoder.pos_conv_embed(feat_project[0])))
+        pre_block = model.dropout(
+            model.layer_norm(feat_project[0] + model.pos_conv_embed(feat_project[0]))
+        )
+        hf_pre_block = hf_model.encoder.dropout(
+            hf_model.encoder.layer_norm(
+                hf_feat_project[0] + hf_model.encoder.pos_conv_embed(feat_project[0])
+            )
+        )
         print(torch.max(torch.abs(pre_block - hf_pre_block)))
 
         model_layer = model.layers[0]
@@ -342,7 +350,3 @@ if __name__ == '__main__':
         hf_model_attn_block = hf_model_layer.attention
         hf_layer_attn_block_output = hf_model_attn_block(hf_model_layer_out)[0]
         print(torch.max(torch.abs(layer_attn_block_output - hf_layer_attn_block_output)))
-
-
-
-

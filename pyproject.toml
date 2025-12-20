@@ -12,6 +12,8 @@ authors = [{ name = "Odunola" }]
 dependencies = [
   "transformers",
   "datasets",
+  "triton>=3.5.1",
+  "numba>=0.63.1",
 ]
 
 [project.optional-dependencies]
