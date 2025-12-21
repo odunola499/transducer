@@ -18,6 +18,18 @@ def _get_activation(name: str):
         return nn.ReLU()
     return nn.Identity()
 
+class Wav2Vec2BertPosEmbedding(nn.Module):
+    def __init__(self, max_source_positions:int, hidden_size:int):
+        super().__init__()
+        self.max_len = max_source_positions
+        self.d_model = hidden_size
+        self.register_buffer('pe', self.extend_pe(torch.tensor(0.0).expand(1, self.max_len)), persistent = False)
+
+    def extend_pe(self, x, pe = None):
+        if pe is not None:
+            pass
+
+
 
 class Wav2Vec2BertFeatureProjection(nn.Module):
     def __init__(self, config: Wav2Vec2BertConfig):
@@ -137,7 +149,7 @@ class Wav2Vec2BertConvolutionModule(nn.Module):
             config.hidden_size,
             config.conv_depthwise_kernel_size,
             stride=1,
-            padding=(config.conv_depthwise_kernel_size - 1) // 2,
+            padding=0,
             groups=config.hidden_size,
             bias=False,
         )
@@ -161,6 +173,8 @@ class Wav2Vec2BertConvolutionModule(nn.Module):
         hidden_states = hidden_states.transpose(1, 2)
         hidden_states = self.pointwise_conv1(hidden_states)
         hidden_states = self.glu(hidden_states)
+
+        hidden_states = torch.nn.functional.pad(hidden_states, (self.depthwise_conv.kernel_size[0] - 1, 0))
 
         hidden_states = self.depthwise_conv(hidden_states)
         hidden_states = self.depthwise_layer_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
@@ -225,6 +239,7 @@ class Wav2Vec2BertEncoder(nn.Module):
     def __init__(self, config: Wav2Vec2BertConfig):
         super().__init__()
         self.config = config
+
         self.dropout = nn.Dropout(config.hidden_dropout)
         self.layers = nn.ModuleList(
             [Wav2Vec2BertEncoderLayer(config) for _ in range(config.num_hidden_layers)]
@@ -375,7 +390,7 @@ def remap_hf_state_dict_wav2vec2bert(state_dict):
 
 if __name__ == "__main__":
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    config = Wav2Vec2BertConfig(num_hidden_layers=2)
+    config = Wav2Vec2BertConfig()
     model = Wav2Vec2BertModel(config)
     model.eval().to(device)
     num_params = sum(p.numel() for p in model.parameters())
@@ -391,10 +406,9 @@ if __name__ == "__main__":
     hf_model = HFWav2Vec2BertModel.from_pretrained("facebook/w2v-bert-2.0")
     hf_model.eval().to(device)
     state_dict = remap_hf_state_dict_wav2vec2bert(hf_model.state_dict())
-    model.load_state_dict(state_dict, strict=False)
+    model.load_state_dict(state_dict)
+    print('loaded all state dict')
     with torch.no_grad():
-        hf_out = hf_model(tensor).last_hidden_state
-        print(torch.max(torch.abs(out - hf_out)))
 
         feature_projection = model.feature_projection
         feat_proj_out, _ = feature_projection(tensor)
@@ -402,7 +416,95 @@ if __name__ == "__main__":
         hf_feature_projection = hf_model.feature_projection
         hf_feat_proj_out, _ = hf_feature_projection(tensor)
 
+        feat_proj_out = model._mask_hidden_states(feat_proj_out, attention_mask = None)
+        hf_feat_proj_out = hf_model._mask_hidden_states(hf_feat_proj_out, mask_time_indices = None, attention_mask = None)
+
         print(torch.max(torch.abs(feat_proj_out - hf_feat_proj_out)))
+
+        encoder = model.encoder
+        hf_encoder = hf_model.encoder
+
+        hidden_states = encoder.dropout(feat_proj_out)
+        hf_hidden_states = hf_encoder.dropout(hf_feat_proj_out)
+        print('drop',torch.max(torch.abs(hidden_states - hf_hidden_states)))
+
+        first_layer = encoder.layers[0]
+        hf_first_layer = hf_encoder.layers[0]
+
+        # ffn1 block
+        ffn1_norm = first_layer.ffn1_layer_norm(hidden_states)
+        hf_ffn1_norm = hf_first_layer.ffn1_layer_norm(hf_hidden_states)
+        print("ffn1_norm", torch.max(torch.abs(ffn1_norm - hf_ffn1_norm)))
+
+        ffn1_out = first_layer.ffn1(ffn1_norm)
+        hf_ffn1_out = hf_first_layer.ffn1(hf_ffn1_norm)
+        print("ffn1_out", torch.max(torch.abs(ffn1_out - hf_ffn1_out)))
+
+        ffn1_res = ffn1_out * 0.5 + hidden_states
+        hf_ffn1_res = hf_ffn1_out * 0.5 + hf_hidden_states
+        print("ffn1_res", torch.max(torch.abs(ffn1_res - hf_ffn1_res)))
+
+        # self attention block
+        attn_norm = first_layer.self_attn_layer_norm(ffn1_res)
+        hf_attn_norm = hf_first_layer.self_attn_layer_norm(hf_ffn1_res)
+        print("attn_norm", torch.max(torch.abs(attn_norm - hf_attn_norm)))
+
+        attn_out, _ = first_layer.self_attn(attn_norm, attention_mask=None)
+        hf_attn_out, _ = hf_first_layer.self_attn(hf_attn_norm, attention_mask=None)
+        attn_out = first_layer.self_attn_dropout(attn_out)
+        hf_attn_out = hf_first_layer.self_attn_dropout(hf_attn_out)
+        print("attn_out", torch.max(torch.abs(attn_out - hf_attn_out)))
+
+        attn_res = attn_out + ffn1_res
+        hf_attn_res = hf_attn_out + hf_ffn1_res
+        print("attn_res", torch.max(torch.abs(attn_res - hf_attn_res)))
+
+        # convolution module
+        conv_out = first_layer.conv_module(attn_res)
+        hf_conv_out = hf_first_layer.conv_module(hf_attn_res)
+        print("conv_out", torch.max(torch.abs(conv_out - hf_conv_out)))
+
+        conv_res = conv_out + attn_res
+        hf_conv_res = hf_conv_out + hf_attn_res
+        print("conv_res", torch.max(torch.abs(conv_res - hf_conv_res)))
+
+        # ffn2 block
+        ffn2_norm = first_layer.ffn2_layer_norm(conv_res)
+        hf_ffn2_norm = hf_first_layer.ffn2_layer_norm(hf_conv_res)
+        print("ffn2_norm", torch.max(torch.abs(ffn2_norm - hf_ffn2_norm)))
+
+        ffn2_out = first_layer.ffn2(ffn2_norm)
+        hf_ffn2_out = hf_first_layer.ffn2(hf_ffn2_norm)
+        print("ffn2_out", torch.max(torch.abs(ffn2_out - hf_ffn2_out)))
+
+        ffn2_res = ffn2_out * 0.5 + conv_res
+        hf_ffn2_res = hf_ffn2_out * 0.5 + hf_conv_res
+        print("ffn2_res", torch.max(torch.abs(ffn2_res - hf_ffn2_res)))
+
+        final_norm = first_layer.final_layer_norm(ffn2_res)
+        hf_final_norm = hf_first_layer.final_layer_norm(hf_ffn2_res)
+        print("final_norm", torch.max(torch.abs(final_norm - hf_final_norm)))
+
+        # complete layer + encoder
+        first_layer_output = first_layer(hidden_states)
+        hf_first_layer_output = hf_first_layer(hf_hidden_states)[0]
+        print("first_layer", torch.max(torch.abs(first_layer_output - hf_first_layer_output)))
+
+        enc_out = encoder(feat_proj_out)
+        hf_enc_out = hf_encoder(hf_feat_proj_out)[0]
+        print("encoder", torch.max(torch.abs(enc_out - hf_enc_out)))
+
+        # full model output comparison
+        model_out = model(tensor)
+        hf_model_out = hf_model(tensor).last_hidden_state
+        print("model", torch.max(torch.abs(model_out - hf_model_out)))
+
+    
+
+
+
+
+
 
 
 
