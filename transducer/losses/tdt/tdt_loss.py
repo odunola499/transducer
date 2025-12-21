@@ -224,7 +224,7 @@ class _TDTNumba(Function):
 class TDTLoss(Loss):
     def __init__(
         self,
-        blank,
+        blank_id,
         durations=None,
         reduction="mean",
         fastemit_lambda: float = 0.0,
@@ -234,7 +234,7 @@ class TDTLoss(Loss):
     ):
         super().__init__()
 
-        self.blank = blank
+        self.blank = blank_id
         self.durations = durations if durations is not None else []
         self.fastemit_lambda = fastemit_lambda
         self.clamp = float(clamp) if clamp > 0 else 0.0
@@ -270,3 +270,19 @@ class TDTLoss(Loss):
             self.sigma,
             self.omega,
         )
+
+if __name__ == "__main__":
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
+    loss_func = TDTLoss(blank_id=0)
+    B, T, U, vocab_size = 4, 10, 7, 16
+    lattice = torch.randn(B, T, U, vocab_size).to(device)
+    lattice = torch.log_softmax(lattice, dim=-1)
+    labels = torch.randint(0, vocab_size, (B, U)).to(device)
+    lattice_lens = torch.randint(2, T, (B,)).to(device)
+    label_lens = torch.randint(2, U, (B,)).to(device)
+
+    print(lattice_lens, label_lens)
+    output = loss_func(lattice, labels, lattice_lens, label_lens)
+    print(output)
+
