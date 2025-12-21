@@ -10,9 +10,10 @@ from transducer.kernels import utils
 from transducer.kernels.gpu_kernels import global_kernels as gpu_rnnt_kernel
 from transducer.kernels.gpu_kernels import helpers as rnnt_helper
 from transducer.kernels.gpu_kernels import reduce
+from transducer.kernels.gpu_kernels.gpu_rnnt import GPURNNT
 
 
-class GPUTDT:
+class GPUTDT(GPURNNT):
     def __init__(
         self,
         sigma: float,
@@ -30,7 +31,18 @@ class GPUTDT:
         num_threads: int,
         stream,
     ):
-        super().__init__()
+        super().__init__(
+            minibatch=minibatch,
+            maxT=maxT,
+            maxU=maxU,
+            alphabet_size=alphabet_size,
+            workspace=workspace,
+            blank=blank,
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+            num_threads=num_threads,
+            stream=stream,
+        )
 
         self.minibatch_ = minibatch
 

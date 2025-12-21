@@ -498,13 +498,3 @@ if __name__ == "__main__":
         model_out = model(tensor)
         hf_model_out = hf_model(tensor).last_hidden_state
         print("model", torch.max(torch.abs(model_out - hf_model_out)))
-
-    
-
-
-
-
-
-
-
-
