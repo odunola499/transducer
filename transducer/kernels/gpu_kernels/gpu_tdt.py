@@ -124,7 +124,6 @@ class GPUTDT(GPURNNT):
 
         if training:
             label_grads *= 0.0  # zero grads
-
             duration_grads *= 0.0  # zero grads
 
         _, (denom, alphas, betas, llForward, llBackward, durations) = self._prepare_workspace()
@@ -134,7 +133,6 @@ class GPUTDT(GPURNNT):
         self.log_softmax(label_acts, denom)
 
         r = random.uniform(0, 1)
-
         if r < self.omega:
             # Compute alphas
 
@@ -197,9 +195,7 @@ class GPUTDT(GPURNNT):
                 # Compute gradient
 
                 grad_blocks_per_grid = self.minibatch_ * self.maxT_ * self.maxU_
-
                 grad_threads_per_block = gpu_rnnt_kernel.GPU_RNNT_THREAD_SIZE
-
                 gpu_rnnt_kernel.compute_grad_kernel[
                     grad_blocks_per_grid, grad_threads_per_block, self.stream_, 0
                 ](

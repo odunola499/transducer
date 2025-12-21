@@ -10,7 +10,6 @@ from transducer.kernels.gpu_kernels.gpu_tdt import GPUTDT
 from transducer.kernels.gpu_kernels.helpers import flatten_tensor, get_workspace_size
 from transducer.kernels.utils import RNNTStatus
 
-
 def tdt_loss_gpu(
     label_acts: torch.Tensor,
     duration_acts: torch.Tensor,
@@ -158,9 +157,7 @@ class _TDTNumba(Function):
             raise ValueError("TDT is not yet implemented for non CUDA computation.")
 
         label_grads = torch.zeros_like(label_acts) if label_acts.requires_grad else None
-
         duration_grads = torch.zeros_like(duration_acts) if duration_acts.requires_grad else None
-
         minibatch_size = label_acts.size(0)
 
         costs = torch.zeros(minibatch_size, device=label_acts.device, dtype=label_acts.dtype)
@@ -272,17 +269,30 @@ class TDTLoss(Loss):
         )
 
 if __name__ == "__main__":
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-    loss_func = TDTLoss(blank_id=0)
-    B, T, U, vocab_size = 4, 10, 7, 16
-    lattice = torch.randn(B, T, U, vocab_size).to(device)
+    torch.manual_seed(0)
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+    durations = [0, 1, 2, 3, 4]
+    label_vocab_size = 12
+    B, T, U = 2, 48, 16
+
+    lattice = torch.randn(B, T, U, label_vocab_size + len(durations), device=device)
     lattice = torch.log_softmax(lattice, dim=-1)
-    labels = torch.randint(0, vocab_size, (B, U)).to(device)
-    lattice_lens = torch.randint(2, T, (B,)).to(device)
-    label_lens = torch.randint(2, U, (B,)).to(device)
 
-    print(lattice_lens, label_lens)
+    labels = torch.randint(0, label_vocab_size, (B, U), device=device)
+    lattice_lens = torch.randint(5, T, (B,), device=device)
+    label_lens = torch.randint(5, U, (B,), device=device)
+
+    loss_func = TDTLoss(
+        blank_id=0,
+        durations=durations,
+        sigma=1.0,
+        omega=0.5, 
+        reduction="mean",
+    )
+
+    print("Input lengths:", lattice_lens)
+    print("Label lengths:", label_lens)
     output = loss_func(lattice, labels, lattice_lens, label_lens)
-    print(output)
-
+    print("Loss:", output)
