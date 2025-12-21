@@ -294,19 +294,20 @@ def spec_augment(
 
 
 if __name__ == "__main__":
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     config = Wav2VecSmallConfig()
     model = Wav2VecModel(config)
-    model.eval()
+    model.eval().to(device)
     num_params = sum([p.numel() for p in model.parameters()])
     print(num_params)
-    tensor = torch.randn(2, 16000)
+    tensor = torch.randn(2, 16000, device = device)
 
     print(tensor.shape)
 
     from transformers import Wav2Vec2Model
 
     hf_model = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base")
-    hf_model.eval()
+    hf_model.eval().to(device)
     hf_num_params = sum([p.numel() for p in model.parameters()])
     print(f"num params: {num_params} hf_params; {hf_num_params}")
 

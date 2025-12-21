@@ -91,7 +91,7 @@ class Wav2Vec2BertAttention(nn.Module):
             scaling=self.scaling,
             dropout=0.0 if not self.training else self.dropout,
         )
-
+        attn_output = attn_output.reshape(bsz, seq_len, -1).contiguous()
         attn_output = self.linear_out(attn_output)
         return attn_output, attn_weights
 
@@ -137,7 +137,7 @@ class Wav2Vec2BertConvolutionModule(nn.Module):
             config.hidden_size,
             config.conv_depthwise_kernel_size,
             stride=1,
-            padding=0,
+            padding=(config.conv_depthwise_kernel_size - 1) // 2,
             groups=config.hidden_size,
             bias=False,
         )
@@ -162,9 +162,6 @@ class Wav2Vec2BertConvolutionModule(nn.Module):
         hidden_states = self.pointwise_conv1(hidden_states)
         hidden_states = self.glu(hidden_states)
 
-        hidden_states = torch.nn.functional.pad(
-            hidden_states, (self.depthwise_conv.kernel_size[0] - 1, 0)
-        )
         hidden_states = self.depthwise_conv(hidden_states)
         hidden_states = self.depthwise_layer_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
         hidden_states = self.activation(hidden_states)
@@ -377,13 +374,14 @@ def remap_hf_state_dict_wav2vec2bert(state_dict):
 
 
 if __name__ == "__main__":
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     config = Wav2Vec2BertConfig(num_hidden_layers=2)
     model = Wav2Vec2BertModel(config)
-    model.eval()
+    model.eval().to(device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"num params: {num_params}")
 
-    tensor = torch.randn(2, 200, config.feature_projection_input_dim)
+    tensor = torch.randn(2, 200, config.feature_projection_input_dim, device = device)
     with torch.no_grad():
         out = model(tensor)
     print(f"output shape: {out.shape}")
@@ -391,9 +389,20 @@ if __name__ == "__main__":
     from transformers import Wav2Vec2BertModel as HFWav2Vec2BertModel
 
     hf_model = HFWav2Vec2BertModel.from_pretrained("facebook/w2v-bert-2.0")
-    hf_model.eval()
+    hf_model.eval().to(device)
     state_dict = remap_hf_state_dict_wav2vec2bert(hf_model.state_dict())
     model.load_state_dict(state_dict, strict=False)
     with torch.no_grad():
         hf_out = hf_model(tensor).last_hidden_state
         print(torch.max(torch.abs(out - hf_out)))
+
+        feature_projection = model.feature_projection
+        feat_proj_out, _ = feature_projection(tensor)
+
+        hf_feature_projection = hf_model.feature_projection
+        hf_feat_proj_out, _ = hf_feature_projection(tensor)
+
+        print(torch.max(torch.abs(feat_proj_out - hf_feat_proj_out)))
+
+
+
