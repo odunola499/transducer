@@ -96,5 +96,4 @@ class DecoderConfig:
     joint_dim: int
     num_layers: int
     dropout: int
-    blank_id: int
     vocab_size:int = 1024

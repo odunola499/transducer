@@ -13,5 +13,4 @@ spm.SentencePieceTrainer.train(
     input = 'tokenizer_data.txt',
     model_prefix = 'tokenizer_model',
     vocab_size = 1024,
-
 )

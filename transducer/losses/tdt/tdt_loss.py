@@ -243,7 +243,10 @@ class TDTLoss(Loss):
     def forward(self, acts, labels, act_lens, label_lens):
         # TODO(hainan): in the future, we could further optimize this so that we don't need to
 
-        # make contiguous copies of the acts tensor.
+        # Lazy, we take all frames as important for now.
+        if act_lens is None:
+            batch_size, num_frames = acts.shape[:-1]
+            act_lens  = torch.tensor([num_frames]* batch_size, device=acts.device, dtype=torch.long)
 
         label_acts, duration_acts = torch.split(
             acts, [acts.shape[-1] - len(self.durations), len(self.durations)], dim=-1

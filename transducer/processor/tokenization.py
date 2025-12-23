@@ -22,8 +22,7 @@ class Tokenizer:
             input = tokenizer_dataset_path,
             model_prefix = self.config.spe_model_prefix,
             vocab_size = self.config.vocab_size,
-            unk_id = self.config.blank_id,
-            user_defined_symbols = [self.config.blank_symbol],
+            unk_id = self.config.unk_id,
             model_type = self.config.spe_model_type,
             character_coverage = 1.0,
             normalization_rule_name = 'nmt_nfkc_cf'
@@ -33,7 +32,7 @@ class Tokenizer:
         self.spm = spm.SentencePieceProcessor()
         self.spm.load(tokenizer_path)
         print(f'Trained tokenizer saved at {tokenizer_path}')
-        print('blank token ',self.spm.id_to_piece(1))
+        print('blank token ',self.spm.id_to_piece(0))
 
         text = 'Transducers for automatic speech recognition is superior'
         print(text,self.spm.encode(text, out_type = int))
@@ -45,6 +44,14 @@ class Tokenizer:
 
     def decode(self, texts:Union[List[int], List[List[int]]]) -> str:
         return self.spm.decode(texts)
+
+    @property
+    def pad_id(self):
+        return self.spm.unk_id()
+
+    @property
+    def unk_id(self):
+        return self.spm.unk_id()
 
     def load(self):
         tokenizer_path = self.config.spe_tokenizer_path
@@ -60,4 +67,6 @@ if __name__ == '__main__':
 
     text = 'hello world'
     output = tokenizer.encode(text)
+    print(tokenizer.pad_id)
+    print(tokenizer.unk_id)
     print(output)

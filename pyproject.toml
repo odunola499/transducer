@@ -19,6 +19,7 @@ dependencies = [
   "torchcodec>=0.9.1",
   "torchaudio>=2.9.1",
   "kernels>=0.11.5",
+  "librosa>=0.11.0",
 ]
 
 [project.optional-dependencies]

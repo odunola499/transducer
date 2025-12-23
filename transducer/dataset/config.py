@@ -1,36 +1,40 @@
 
 from typing import List, Literal, Optional, Union
 from transducer.commons import Args
+from dataclasses import dataclass
+
 
 class TokenizerConfig(Args):
     vocab_size:int = 1024
-    spe_tokenizer_path: Optional[str] = './lowercase_tokenizer.model'
+    spe_tokenizer_path: Optional[str] = '../processor/lowercase_tokenizer.model'
     spe_model_prefix: str = 'tokenizer'
     train_new_tokenizer: bool = False
     tokenizer_dataset_path: Optional[str] = None
-    bos_id: int = 1
-    eos_id: int = 2
-    pad_id: int = 3
-    unk_id: int = 4
-    blank_id: int = 0
-    blank_symbol: str = "<blank>"
+    unk_id: int = 0
     spe_model_type: Literal['bpe', 'unigram', 'char', 'word'] = 'bpe'
+
+@dataclass
+class DatasetStruct:
+    audio_column_name: str = 'audio'
+    text_column_name: str = 'text'
+
+class HFDatasetStruct(DatasetStruct):
+    hf_dataset_name: Optional[str] = None
+    hf_dataset_suffix: Optional[str] = None
+    hf_dataset_split: str = 'train'
+    hf_cache_dir: str = 'data'
+
+class JsonlDatasetStruct(DatasetStruct):
+    jsonl_filepath: Optional[str] = None
+
 
 class DatasetConfig(Args):
     dataset_type: Literal['hf', 'jsonl']
-    tokenizer: TokenizerConfig = TokenizerConfig()
+    train_data: Union[DatasetStruct, JsonlDatasetStruct]
+    val_data: Union[DatasetStruct, JsonlDatasetStruct]
+    tokenizer_config: TokenizerConfig = TokenizerConfig()
+    feature_extractor_type:Literal['wav2vec2', 'wav2vecbert'] = 'wav2vec'
     sample_rate:int = 16000
-
-    # HF dataset
-    dataset_name: Optional[str] = None
-    dataset_suffix: Optional[str] = None
-
-    # jsonl dataset
-    jsonl_filepath:Optional[str] = None
-
-    train_split: Optional[float] = None
-    val_split: Optional[float] = None
-    test_split: Optional[float] = None
 
     min_audio_length_ms:Optional[int] = 100
     max_audio_length_ms:Optional[int] = 30000
@@ -41,9 +45,7 @@ class DatasetConfig(Args):
     num_workers:int = 8
     pin_memory:bool = True
 
-    feature_extractor_type:Literal['wav2vec', 'wav2vecbert'] = "wav2vec"
 
-    # Tokenizer
 
 
 

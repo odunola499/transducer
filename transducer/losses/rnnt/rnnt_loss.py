@@ -252,20 +252,24 @@ class _RNNTNumba(Function):
 class RNNTLoss(Loss):
     def __init__(
         self,
-        blank,
+        blank_id,
         reduction="mean",
         fastemit_lambda: float = 0.0,
         clamp: float = 0.0,
     ):
         super().__init__()
-        self.blank = blank
+        self.blank = blank_id
         self.reduction = reduction
         self.fastemit_lambda = fastemit_lambda
         self.clamp = clamp
         self.reduction = reduction
         self.loss = _RNNTNumba.apply
 
-    def forward(self, acts: Tensor, labels: Tensor, act_lens: Tensor, label_lens):
+    def forward(self, acts: Tensor, labels: Tensor, label_lens, act_lens: Tensor = None):
+        # Lazy, we take all frames as important for now.
+        if act_lens is None:
+            batch_size, num_frames = acts.shape[:-1]
+            act_lens  = torch.tensor([num_frames]* batch_size, device=acts.device, dtype=torch.long)
         if not acts.is_cuda:
             if acts.dtype == torch.float16:
                 acts = acts.float()
@@ -287,8 +291,7 @@ class RNNTLoss(Loss):
 
 if __name__ == "__main__":
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    device = torch.device('cpu')
-    loss_func = RNNTLoss(blank=0)
+    loss_func = RNNTLoss(blank_id=0)
     B, T, U, vocab_size = 4, 10, 7, 16
     lattice = torch.randn(B, T, U, vocab_size).to(device)
     lattice = torch.log_softmax(lattice, dim=-1)
