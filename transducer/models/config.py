@@ -90,7 +90,6 @@ class Wav2Vec2BertConfig(EncoderConfig):
 
 @dataclass
 class DecoderConfig:
-    vocab_size: int
     embed_dim: int
     hidden_dim: int
     pred_dim: int
@@ -98,3 +97,4 @@ class DecoderConfig:
     num_layers: int
     dropout: int
     blank_id: int
+    vocab_size:int = 1024

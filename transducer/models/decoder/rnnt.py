@@ -19,6 +19,7 @@ class RNNTClassicPredictor(Predictor):
             dropout=0.0,
         )
         self.proj = nn.Linear(config.hidden_dim, config.pred_dim)
+        self.config = config
 
     def forward(self, input_ids: Tensor, state: Optional[Tensor] = None):
         input_embeds = self.text_embed(input_ids)
@@ -32,6 +33,9 @@ class RNNTClassicPredictor(Predictor):
         output, new_state = self.gru(input_embeds, state)
         output = self.proj(output.squeeze(1))
         return output, new_state
+
+    def init_state(self, batch_size:int = 1):
+        return torch.zeros(self.config.num_layers,batch_size, self.gru.hidden_size)
 
 
 class RNNTJoiner(Joiner):

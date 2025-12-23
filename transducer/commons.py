@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import List, Union
 
 from torch import Tensor, nn
 from pydantic import BaseModel
@@ -15,6 +16,17 @@ class Args(BaseModel):
 class EncoderOutput:
     last_hidden_state: Tensor
 
+@dataclass
+class Hypothesis:
+    tokens:Tensor
+    pred_out:Tensor
+    pred_state:Tensor
+    score:Tensor
+
+@dataclass
+class GenerationOutput:
+    ids:Tensor
+    labels: Union[List[str], List[int]]
 
 class Encoder(nn.Module, ABC):
     @abstractmethod
@@ -24,9 +36,12 @@ class Encoder(nn.Module, ABC):
 
 class Predictor(nn.Module, ABC):
     @abstractmethod
-    def step(self, input_ids: Tensor, **kwargs):
+    def step(self, input_ids: Tensor, state: Tensor) -> Tensor:
         pass
 
+    @abstractmethod
+    def init_state(self, batch_size: int):
+        pass
 
 class Joiner(nn.Module, ABC):
     ...

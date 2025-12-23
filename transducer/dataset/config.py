@@ -2,8 +2,23 @@
 from typing import List, Literal, Optional, Union
 from transducer.commons import Args
 
+class TokenizerConfig(Args):
+    vocab_size:int = 1024
+    spe_tokenizer_path: Optional[str] = './lowercase_tokenizer.model'
+    spe_model_prefix: str = 'tokenizer'
+    train_new_tokenizer: bool = False
+    tokenizer_dataset_path: Optional[str] = None
+    bos_id: int = 1
+    eos_id: int = 2
+    pad_id: int = 3
+    unk_id: int = 4
+    blank_id: int = 0
+    blank_symbol: str = "<blank>"
+    spe_model_type: Literal['bpe', 'unigram', 'char', 'word'] = 'bpe'
+
 class DatasetConfig(Args):
     dataset_type: Literal['hf', 'jsonl']
+    tokenizer: TokenizerConfig = TokenizerConfig()
     sample_rate:int = 16000
 
     # HF dataset
@@ -28,7 +43,8 @@ class DatasetConfig(Args):
 
     feature_extractor_type:Literal['wav2vec', 'wav2vecbert'] = "wav2vec"
 
-    spe_tokenizer_path:Optional[str] = None
-    train_new_tokenizer:bool = False
-    vocab_size:int = 64
+    # Tokenizer
+
+
+
 

@@ -48,7 +48,7 @@ class BaseDataset(Dataset):
     def validate_pretrained_tokenizer(self):
         """
         Check if
-        1. Pretrained tokenizer exists
+        1. Pretrained tokenizer exists at a path
         2. Pretrained tokenizer vocab size is valid with vocab_size in config
-        3.
+        3. If not valid crash with proper error message
         """
