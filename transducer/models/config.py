@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, Optional
+from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr
+from transducer.config_base import Args
 
 
-@dataclass
-class EncoderConfig:
+class EncoderConfig(Args):
     attn_impl: Literal["flash_attn", "sdpa", "math"] = "sdpa"
 
     @property
@@ -11,89 +11,100 @@ class EncoderConfig:
         return getattr(self, "hidden_size", None)
 
 
-@dataclass
 class Wav2VecSmallConfig(EncoderConfig):
-    dropout: float = 0.1
-    conv_dim: list[int] = field(default_factory=lambda: [512, 512, 512, 512, 512, 512, 512])
-    conv_kernel: list[int] = field(default_factory=lambda: [10, 3, 3, 3, 3, 2, 2])
-    conv_stride: list[int] = field(default_factory=lambda: [5, 2, 2, 2, 2, 2, 2])
-    num_feat_extract_layers: int = 7
-    final_dropout: float = 0.0
-    hidden_size: int = 768
-    intermediate_size: int = 3072
-    layer_norm_eps: float = 1e-5
-    layerdrop: float = 0.0
-    num_attention_heads: int = 12
-    num_conv_pos_embedding_groups: int = 16
-    num_conv_pos_embeddings: int = 128
-    num_hidden_layers: int = 12
-    conv_bias: bool = False
-    feat_proj_dropout: float = 0.1
-    activation_dropout: float = 0.0
-    hidden_dropout: float = 0.1
+    model_name:StrictStr = 'wav2vec2small'
+    dropout: StrictFloat = 0.1
+    conv_dim: list[StrictInt] = Field(default_factory=lambda: [512, 512, 512, 512, 512, 512, 512])
+    conv_kernel: list[StrictInt] = Field(default_factory=lambda: [10, 3, 3, 3, 3, 2, 2])
+    conv_stride: list[StrictInt] = Field(default_factory=lambda: [5, 2, 2, 2, 2, 2, 2])
+    num_feat_extract_layers: StrictInt = 7
+    final_dropout: StrictFloat = 0.0
+    hidden_size: StrictInt = 768
+    intermediate_size: StrictInt = 3072
+    layer_norm_eps: StrictFloat = 1e-5
+    layerdrop: StrictFloat = 0.0
+    num_attention_heads: StrictInt = 12
+    num_conv_pos_embedding_groups: StrictInt = 16
+    num_conv_pos_embeddings: StrictInt = 128
+    num_hidden_layers: StrictInt = 12
+    conv_bias: StrictBool = False
+    feat_proj_dropout: StrictFloat = 0.1
+    activation_dropout: StrictFloat = 0.0
+    hidden_dropout: StrictFloat = 0.1
 
 
-@dataclass
 class Wav2VecLargeConfig(Wav2VecSmallConfig):
-    activation_dropout: float = 0.1
-    apply_spec_augment: bool = True
-    attention_dropout: float = 0.1
-    feat_extract_activation: str = "gelu"
-    feat_extract_dropout: float = 0.0
-    feat_extract_norm: str = "group"
-    final_dropout: float = 0.1
-    hidden_act: str = "gelu"
-    hidden_dropout: float = 0.1
-    hidden_size: int = 1024
-    intermediate_size: int = 4096
-    layerdrop: float = 0.1
-    mask_feature_length: int = 10
-    mask_feature_prob: float = 0.0
-    mask_time_length: int = 10
-    mask_time_prob: float = 0.05
-    num_attention_heads: int = 16
-    num_hidden_layers: int = 24
-    proj_codevector_dim: int = 768
-    vocab_size: int = 32
+    model_name:StrictStr = 'wav2veclarge'
+    activation_dropout: StrictFloat = 0.1
+    apply_spec_augment: StrictBool = True
+    attention_dropout: StrictFloat = 0.1
+    feat_extract_activation: StrictStr = "gelu"
+    feat_extract_dropout: StrictFloat = 0.0
+    feat_extract_norm: StrictStr = "group"
+    final_dropout: StrictFloat = 0.1
+    hidden_act: StrictStr = "gelu"
+    hidden_dropout: StrictFloat = 0.1
+    hidden_size: StrictInt = 1024
+    intermediate_size: StrictInt = 4096
+    layerdrop: StrictFloat = 0.1
+    mask_feature_length: StrictInt = 10
+    mask_feature_prob: StrictFloat = 0.0
+    mask_time_length: StrictInt = 10
+    mask_time_prob: StrictFloat = 0.05
+    num_attention_heads: StrictInt = 16
+    num_hidden_layers: StrictInt = 24
+    proj_codevector_dim: StrictInt = 768
 
 
 Wav2VecConfig = Wav2VecSmallConfig | Wav2VecLargeConfig
 
 
-@dataclass
 class Wav2Vec2BertConfig(EncoderConfig):
-    activation_dropout: float = 0.0
-    apply_spec_augment: bool = False
-    attention_dropout: float = 0.0
-    conv_depthwise_kernel_size: int = 31
-    conformer_conv_dropout: float = 0.1
-    feat_proj_dropout: float = 0.0
-    feature_projection_input_dim: int = 160
-    hidden_act: str = "swish"
-    hidden_dropout: float = 0.0
-    hidden_size: int = 1024
-    intermediate_size: int = 4096
-    layer_norm_eps: float = 1e-5
-    layerdrop: float = 0.1
-    left_max_position_embeddings: int = 64
-    mask_feature_length: int = 10
-    mask_feature_min_masks: int = 0
-    mask_feature_prob: float = 0.0
-    mask_time_length: int = 10
-    mask_time_min_masks: int = 2
-    mask_time_prob: float = 0.05
-    num_attention_heads: int = 16
-    num_hidden_layers: int = 24
-    position_embeddings_type: str = "relative_key"
-    right_max_position_embeddings: int = 8
+    model_name:StrictStr = 'wav2vec2bert'
+    activation_dropout: StrictFloat = 0.0
+    apply_spec_augment: StrictBool = False
+    attention_dropout: StrictFloat = 0.0
+    conv_depthwise_kernel_size: StrictInt = 31
+    conformer_conv_dropout: StrictFloat = 0.1
+    feat_proj_dropout: StrictFloat = 0.0
+    feature_projection_input_dim: StrictInt = 160
+    hidden_act: StrictStr = "swish"
+    hidden_dropout: StrictFloat = 0.0
+    hidden_size: StrictInt = 1024
+    intermediate_size: StrictInt = 4096
+    layer_norm_eps: StrictFloat = 1e-5
+    layerdrop: StrictFloat = 0.1
+    left_max_position_embeddings: StrictInt = 64
+    mask_feature_length: StrictInt = 10
+    mask_feature_min_masks: StrictInt = 0
+    mask_feature_prob: StrictFloat = 0.0
+    mask_time_length: StrictInt = 10
+    mask_time_min_masks: StrictInt = 2
+    mask_time_prob: StrictFloat = 0.05
+    num_attention_heads: StrictInt = 16
+    num_hidden_layers: StrictInt = 24
+    position_embeddings_type: StrictStr = "relative_key"
+    right_max_position_embeddings: StrictInt = 8
 
 
-@dataclass
-class DecoderConfig:
-    embed_dim: int
-    hidden_dim: int
-    pred_dim: int
-    joint_dim: int
-    num_layers: int
-    dropout: int
-    vocab_size:int = 1024
+class DecoderConfig(Args):
+    rnn_type:Literal['gru','lstm'] = 'gru'
+    embed_dim: StrictInt
+    hidden_dim: StrictInt = 1024
+    pred_dim: StrictInt = 640
+    joint_dim: StrictInt = 640
+    num_layers: StrictInt
+    dropout: StrictFloat
+    vocab_size:StrictInt = 1024
+
+
+class ModelConfig(Args):
+    model_name:StrictStr # Used for logging etc
+    loss_type:Literal['tdt','rnnt'] = 'rnnt'
+    loss_duration:Optional[list[StrictInt]] = None
+    fastemit_lambda: StrictFloat = 0.0
+    blank_id: StrictInt = 0
+    loss_reduction:Literal['sum','mean'] = 'sum'
+    sampler_type:Literal['greedy_search','beam_search'] = 'greedy_search'
+    encoder_config: Wav2VecSmallConfig | Wav2VecLargeConfig | Wav2Vec2BertConfig
+    decoder_config: DecoderConfig

@@ -342,6 +342,9 @@ class Wav2Vec2BertModel(Encoder):
             self.load_state_dict(weights, strict=False)
         return weights
 
+    def encoder_name(self):
+        return "wav2vecbert"
+
 
 def remap_hf_state_dict_wav2vec2bert(state_dict):
     remapped = {}

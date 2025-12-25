@@ -1,52 +1,46 @@
 
-from typing import List, Literal, Optional, Union
-from transducer.commons import Args
-from dataclasses import dataclass
+from typing import Literal, Optional, Union
+from pydantic import StrictBool, StrictInt, StrictStr
+from transducer.config_base import Args
 
 
 class TokenizerConfig(Args):
-    vocab_size:int = 1024
-    spe_tokenizer_path: Optional[str] = '../processor/lowercase_tokenizer.model'
-    spe_model_prefix: str = 'tokenizer'
-    train_new_tokenizer: bool = False
-    tokenizer_dataset_path: Optional[str] = None
-    unk_id: int = 0
+    vocab_size:StrictInt = 1024
+    spe_tokenizer_path: Optional[StrictStr] = '../processor/lowercase_tokenizer.model'
+    spe_model_prefix: StrictStr = 'tokenizer'
+    train_new_tokenizer: StrictBool = False
+    tokenizer_dataset_path: Optional[StrictStr] = None
+    unk_id: StrictInt = 0
     spe_model_type: Literal['bpe', 'unigram', 'char', 'word'] = 'bpe'
 
-@dataclass
-class DatasetStruct:
-    audio_column_name: str = 'audio'
-    text_column_name: str = 'text'
+class DatasetStruct(Args):
+    audio_column_name: StrictStr = 'audio'
+    text_column_name: StrictStr = 'text'
 
 class HFDatasetStruct(DatasetStruct):
-    hf_dataset_name: Optional[str] = None
-    hf_dataset_suffix: Optional[str] = None
-    hf_dataset_split: str = 'train'
-    hf_cache_dir: str = 'data'
+    hf_dataset_name: Optional[StrictStr] = None
+    hf_dataset_suffix: Optional[StrictStr] = None
+    hf_dataset_split: StrictStr = 'train'
+    hf_cache_dir: StrictStr = 'data'
 
 class JsonlDatasetStruct(DatasetStruct):
-    jsonl_filepath: Optional[str] = None
+    jsonl_filepath: Optional[StrictStr] = None
 
 
 class DatasetConfig(Args):
     dataset_type: Literal['hf', 'jsonl']
-    train_data: Union[DatasetStruct, JsonlDatasetStruct]
-    val_data: Union[DatasetStruct, JsonlDatasetStruct]
+    train_data: Union[HFDatasetStruct, JsonlDatasetStruct]
+    val_data: Union[HFDatasetStruct, JsonlDatasetStruct]
     tokenizer_config: TokenizerConfig = TokenizerConfig()
-    feature_extractor_type:Literal['wav2vec2', 'wav2vecbert'] = 'wav2vec'
-    sample_rate:int = 16000
+    feature_extractor_type:Literal['wav2vec2', 'wav2vec-bert'] = 'wav2vec2'
+    sample_rate:StrictInt = 16000
 
-    min_audio_length_ms:Optional[int] = 100
-    max_audio_length_ms:Optional[int] = 30000
-    min_text_length:Optional[int] = 100
-    max_text_length:Optional[int] = 3000
+    min_audio_length_ms:Optional[StrictInt] = 100
+    max_audio_length_ms:Optional[StrictInt] = 30000
+    min_text_length:Optional[StrictInt] = 100
+    max_text_length:Optional[StrictInt] = 3000
 
-    shuffle:bool = True
-    num_workers:int = 8
-    pin_memory:bool = True
-
-
-
-
-
+    shuffle:StrictBool = True
+    num_workers:StrictInt = 8
+    pin_memory:StrictBool = True
 

@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 
 import torch
 import numpy as np
-from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data import Dataset, IterableDataset, get_worker_info
 from typing import Union
 from io import BytesIO
 import librosa
@@ -10,6 +10,8 @@ from typing import Optional
 from transducer.dataset.config import DatasetConfig
 from transducer.processor import Processor, Tokenizer
 from transformers import AutoFeatureExtractor
+from torch import distributed as dist
+
 
 FEATURE_EXTRACTORS = {
     'wav2vec2': AutoFeatureExtractor.from_pretrained('facebook/wav2vec2-base'),
@@ -21,7 +23,7 @@ class BaseDataset(Dataset, ABC):
         self.config = config
         tokenizer_config = config.tokenizer_config
         tokenizer = Tokenizer(tokenizer_config)
-        feature_extractor = FEATURE_EXTRACTORS[tokenizer_config.feature_extractor_type]
+        feature_extractor = FEATURE_EXTRACTORS[config.feature_extractor_type]
         processor = Processor(feature_extractor = feature_extractor, tokenizer = tokenizer)
         self.processor = processor
 
@@ -47,20 +49,41 @@ class BaseDataset(Dataset, ABC):
 
 
     @abstractmethod
-    def __collate_fn(self, batch):
-        pass
+    def _collate_fn(self, batch):
+        raise NotImplementedError
 
-class BaseDataset(IterableDataset, ABC):
+class StreamingBaseDataset(IterableDataset, ABC):
     def __init__(self, config:DatasetConfig) -> None:
         super().__init__()
         self.config = config
         tokenizer_config = config.tokenizer_config
         tokenizer = Tokenizer(tokenizer_config)
-        feature_extractor = FEATURE_EXTRACTORS[tokenizer_config.feature_extractor_type]
+        feature_extractor = FEATURE_EXTRACTORS[config.feature_extractor_type]
         processor = Processor(feature_extractor = feature_extractor, tokenizer = tokenizer)
         self.processor = processor
 
         self.sample_rate = config.sample_rate
+
+    def should_yield(self, index:int) -> bool:
+        worker_info = get_worker_info()
+        if not dist.is_available() or not dist.is_initialized():
+            return True
+        else:
+            rank = dist.get_rank()
+            world_size = dist.get_world_size()
+            if worker_info is None:
+                worker_id = 0
+                num_workers = 1
+            else:
+                worker_id = worker_info.id
+                num_workers = worker_info.num_workers
+
+            global_worker_id = rank * num_workers + worker_id
+            total_workers = world_size * num_workers
+
+            if index % total_workers == global_worker_id:
+                return True
+            return False
 
     def load_audio(self, audio:Union[np.ndarray, bytes, str], orig_sr:Optional[int] = None) -> np.ndarray:
         if isinstance(audio, np.ndarray):
@@ -82,6 +105,5 @@ class BaseDataset(IterableDataset, ABC):
 
 
     @abstractmethod
-    def __collate_fn(self, batch):
-        pass
-
+    def _collate_fn(self, batch):
+        raise NotImplementedError
