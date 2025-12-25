@@ -7,6 +7,7 @@ from transducer.dataset.config import (
     TokenizerConfig,
 )
 from transducer.dataset.hf_dataset import HFDataset, StreamingHFDataset
+from transducer.dataset.jsonl_dataset import JsonlDataset
 
 __all__ = [
     "BaseDataset",
@@ -18,4 +19,5 @@ __all__ = [
     "TokenizerConfig",
     "HFDataset",
     "StreamingHFDataset",
+    "JsonlDataset",
 ]

@@ -12,6 +12,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+import wandb
 from rich.table import Table
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, Dataset, IterableDataset
@@ -129,10 +130,7 @@ class TrainModule:
         self.wandb_run = None
         if self.config.log_to != "wandb":
             return
-        try:
-            import wandb
-        except ImportError as exc:
-            raise ImportError("Install wandb to enable logging.") from exc
+
         run_name = f"{self.config.wandb_name}_r{self.rank}"
         group_name = self.config.wandb_name
         self.wandb = wandb
@@ -154,6 +152,9 @@ class TrainModule:
         for key, value in batch.items():
             if key == "indices":
                 continue
+            if key == "texts":
+                moved[key] = value
+                continue
             if isinstance(value, torch.Tensor):
                 moved[key] = value.to(self.device, non_blocking=True)
             else:
@@ -167,6 +168,12 @@ class TrainModule:
             ids = labels[i, : label_lens[i]].tolist()
             texts.append(tokenizer.decode(ids))
         return texts
+
+    def _get_target_texts(self, batch: Dict[str, Any]) -> list[str]:
+        raw_texts = batch.get("texts")
+        if raw_texts:
+            return list(raw_texts)
+        return self._decode_texts(batch["labels"], batch["label_lens"])
 
     def _predict_texts(self, features: torch.Tensor) -> list[str]:
         output = self.raw_model.decode_features(features)
@@ -219,7 +226,7 @@ class TrainModule:
                 total_loss += loss.item()
 
                 preds = self._predict_texts(batch["audio_features"])
-                targets = self._decode_texts(batch["labels"], batch["label_lens"])
+                targets = self._get_target_texts(batch)
                 total_wer += wer(targets, preds)
                 num_batches += 1
 
@@ -363,7 +370,7 @@ class TrainModule:
                         and self.rank == 0
                     ):
                         preds = self._predict_texts(batch["audio_features"])
-                        targets = self._decode_texts(batch["labels"], batch["label_lens"])
+                        targets = self._get_target_texts(batch)
                         self._print_predictions(
                             preds[: self.config.max_print_predictions],
                             targets[: self.config.max_print_predictions],

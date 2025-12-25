@@ -7,8 +7,8 @@ import torch.distributed as dist
 from rich.console import Console
 
 from transducer.config import Config
-from transducer.dataset import HFDataset
-from transducer.dataset.config import DatasetConfig, HFDatasetStruct
+from transducer.dataset import HFDataset, JsonlDataset
+from transducer.dataset.config import DatasetConfig, HFDatasetStruct, JsonlDatasetStruct
 from transducer.models import DawnModel
 from transducer.train.train_module import TrainModule
 
@@ -26,17 +26,25 @@ def _init_distributed() -> Optional[int]:
 
 
 def _build_dataloaders(config: DatasetConfig, train_batch_size: int, eval_batch_size: int):
-    if config.dataset_type != "hf":
-        raise NotImplementedError("Only HF datasets are supported right now.")
     train_data = config.train_data
     val_data = config.val_data
-    if not isinstance(train_data, HFDatasetStruct):
-        raise ValueError("train_data must be HFDatasetStruct when dataset_type='hf'.")
-    if not isinstance(val_data, HFDatasetStruct):
-        raise ValueError("val_data must be HFDatasetStruct when dataset_type='hf'.")
+    if config.dataset_type == "hf":
+        if not isinstance(train_data, HFDatasetStruct):
+            raise ValueError("train_data must be HFDatasetStruct when dataset_type='hf'.")
+        if not isinstance(val_data, HFDatasetStruct):
+            raise ValueError("val_data must be HFDatasetStruct when dataset_type='hf'.")
+        train_dataset = HFDataset(train_data, config)
+        val_dataset = HFDataset(val_data, config)
+    elif config.dataset_type == "jsonl":
+        if not isinstance(train_data, JsonlDatasetStruct):
+            raise ValueError("train_data must be JsonlDatasetStruct when dataset_type='jsonl'.")
+        if not isinstance(val_data, JsonlDatasetStruct):
+            raise ValueError("val_data must be JsonlDatasetStruct when dataset_type='jsonl'.")
+        train_dataset = JsonlDataset(train_data, config)
+        val_dataset = JsonlDataset(val_data, config)
+    else:
+        raise NotImplementedError(f"Unsupported dataset_type: {config.dataset_type}")
 
-    train_dataset = HFDataset(train_data, config)
-    val_dataset = HFDataset(val_data, config)
     train_loader = train_dataset.get_loader(train_batch_size)
     val_loader = val_dataset.get_loader(eval_batch_size)
     return train_loader, val_loader, train_dataset

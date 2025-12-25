@@ -25,12 +25,13 @@ class HFDataset(BaseDataset):
     def __getitem__(self, idx):
         row = self.hf_dataset[idx]
         audio = row[self.dataset_config.audio_column_name]['bytes']
-        text = row[self.dataset_config.text_column_name]
+        raw_text = row[self.dataset_config.text_column_name]
         audio = self.load_audio(audio)
-        text = self.processor.tokenize(text)
+        text = self.processor.tokenize(raw_text)
         return {
             'audio': audio,
             'text': text,
+            'raw_text': raw_text,
             'index': idx,
         }
 
@@ -38,6 +39,7 @@ class HFDataset(BaseDataset):
         audios = [i['audio'] for i in batch]
         texts = [i['text'] for i in batch]
         indices = [i['index'] for i in batch]
+        raw_texts = [i.get("raw_text") for i in batch]
 
         features = self.processor.extract_features(
             audios, sampling_rate=self.sample_rate, return_tensors='pt'
@@ -55,6 +57,7 @@ class HFDataset(BaseDataset):
             'label_lens': label_lens,
             'audio_lens': None,
             'indices': indices,
+            'texts': raw_texts,
         }
 
     def get_loader(self, batch_size):
@@ -91,12 +94,13 @@ class StreamingHFDataset(StreamingBaseDataset):
             if not self.should_yield(index):
                 continue
             audio = row[self.dataset_config.audio_column_name]['bytes']
-            text = row[self.dataset_config.text_column_name]
+            raw_text = row[self.dataset_config.text_column_name]
             audio = self.load_audio(audio)
-            text = self.processor.tokenize(text)
+            text = self.processor.tokenize(raw_text)
             yield {
                 'audio': audio,
                 'text': text,
+                'raw_text': raw_text,
                 'index': index,
             }
 
@@ -104,6 +108,7 @@ class StreamingHFDataset(StreamingBaseDataset):
         audios = [i['audio'] for i in batch]
         texts = [i['text'] for i in batch]
         indices = [i['index'] for i in batch]
+        raw_texts = [i.get("raw_text") for i in batch]
 
         features = self.processor.extract_features(
             audios, sampling_rate=self.sample_rate, return_tensors='pt'
@@ -121,6 +126,7 @@ class StreamingHFDataset(StreamingBaseDataset):
             'label_lens': label_lens,
             'audio_lens': None,
             'indices': indices,
+            'texts': raw_texts,
         }
 
     def get_loader(self, batch_size):
