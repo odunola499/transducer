@@ -28,11 +28,11 @@ class JsonlDatasetStruct(DatasetStruct):
 
 
 class DatasetConfig(Args):
-    dataset_type: Literal['hf', 'jsonl']
+    dataset_type: Literal['hf', 'stream_hf', 'jsonl']
     train_data: Union[HFDatasetStruct, JsonlDatasetStruct]
     val_data: Union[HFDatasetStruct, JsonlDatasetStruct]
     tokenizer_config: TokenizerConfig = TokenizerConfig()
-    feature_extractor_type:Literal['wav2vec2', 'wav2vec-bert'] = 'wav2vec2'
+    feature_extractor_type:Literal['wav2vec2', 'wav2vecbert'] = 'wav2vec2'
     sample_rate:StrictInt = 16000
 
     min_audio_length_ms:Optional[StrictInt] = 100

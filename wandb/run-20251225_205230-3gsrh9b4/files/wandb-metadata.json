@@ -1,0 +1,42 @@
+{
+  "os":  "Linux-6.8.0-40-generic-x86_64-with-glibc2.35",
+  "python":  "CPython 3.11.11",
+  "startedAt":  "2025-12-25T20:52:30.674883Z",
+  "args":  [
+    "--config",
+    "conf/config_wav2vec2_small.yaml"
+  ],
+  "program":  "-m transducer.train.run",
+  "git":  {
+    "remote":  "https://github.com/odunola499/transducer.git",
+    "commit":  "5fb7ad1c970664438c4ef1a12dbe54c45e604139"
+  },
+  "email":  "jenrola2292@gmail.com",
+  "root":  "/root/transducer",
+  "host":  "d98e8dfdaca3",
+  "executable":  "/root/transducer/.venv/bin/python3",
+  "cpu_count":  64,
+  "cpu_count_logical":  128,
+  "gpu":  "NVIDIA RTX A5000",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "128849018880",
+      "used":  "11873742848"
+    }
+  },
+  "memory":  {
+    "total":  "270069317632"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA RTX A5000",
+      "memoryTotal":  "25757220864",
+      "cudaCores":  8192,
+      "architecture":  "Ampere",
+      "uuid":  "GPU-230ef634-9fe9-fb37-8966-294b6387f719"
+    }
+  ],
+  "cudaVersion":  "12.8",
+  "writerId":  "kj4psy2reybiz649zjn3b3engzv2ijw1"
+}

@@ -1,0 +1,82 @@
+train:
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  devices: -1
+  max_steps: 50000
+  num_warmup_steps: 0.1
+  accumulate_grad_batches: 4
+  lr: 0.0003
+  precision: bf16
+  strategy: ddp
+  log_to: wandb
+  wandb_name: dawn_w2v2small
+  wandb_project: transducer
+  wandb_entity: null
+  log_every_num_steps: 10
+  num_sanity_val_steps: 2
+  check_val_every_num_steps: 500
+  enable_checkpointing: false
+  monitor: val_wer
+  save_top_k: 1
+  checkpoint_dir: ./checkpoints
+  pretrained_checkpoint_dir: null
+  scheduler: linear
+  optimizer: adamw
+  print_predictions: false
+  print_predictions_every_num_steps: 10
+  max_print_predictions: 2
+  log_indices: true
+  log_indices_every_num_steps: 1
+  max_log_indices: 16
+
+model:
+  model_name: dawn
+  loss_type: rnnt
+  loss_duration: null
+  fastemit_lambda: 0.0
+  blank_id: 1024
+  loss_reduction: mean
+  sampler_type: greedy_search
+  encoder_config:
+    model_name: wav2vec2small
+  decoder_config:
+    rnn_type: gru
+    embed_dim: 256
+    hidden_dim: 512
+    pred_dim: 320
+    joint_dim: 320
+    num_layers: 1
+    dropout: 0.1
+    vocab_size: 1024
+
+dataset:
+  dataset_type: stream_hf
+  train_data:
+    hf_dataset_name: MLCommons/peoples_speech
+    hf_dataset_suffix: clean
+    hf_dataset_split: train
+    audio_column_name: audio
+    text_column_name: text
+  val_data:
+    hf_dataset_name: MLCommons/peoples_speech
+    hf_dataset_suffix: clean
+    hf_dataset_split: validation
+    audio_column_name: audio
+    text_column_name: text
+  tokenizer_config:
+    vocab_size: 1024
+    spe_tokenizer_path: transducer/processor/lowercase_tokenizer.model
+    spe_model_prefix: tokenizer
+    train_new_tokenizer: false
+    tokenizer_dataset_path: null
+    unk_id: 0
+    spe_model_type: bpe
+  feature_extractor_type: wav2vec2
+  sample_rate: 16000
+  min_audio_length_ms: 100
+  max_audio_length_ms: 30000
+  min_text_length: 1
+  max_text_length: 3000
+  shuffle: true
+  num_workers: 2
+  pin_memory: true

@@ -45,6 +45,5 @@ class TrainConfig(Args):
     max_log_indices: StrictInt = 32
 
     def model_post_init(self, __context):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        rank = os.getenv('RANK')
-        self.wandb_name = f"{self.wandb_name}_{timestamp}_r{rank}"
+        # Keep wandb_name stable; timestamp is appended at runtime in TrainModule._setup_wandb.
+        return

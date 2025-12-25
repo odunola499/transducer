@@ -245,7 +245,7 @@ class TDTLoss(Loss):
 
         # Lazy, we take all frames as important for now.
         if act_lens is None:
-            batch_size, num_frames = acts.shape[:-1]
+            batch_size, num_frames = acts.shape[:2]
             act_lens  = torch.tensor([num_frames]* batch_size, device=acts.device, dtype=torch.long)
 
         label_acts, duration_acts = torch.split(

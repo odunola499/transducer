@@ -15,7 +15,7 @@ from torch import distributed as dist
 
 FEATURE_EXTRACTORS = {
     'wav2vec2': AutoFeatureExtractor.from_pretrained('facebook/wav2vec2-base'),
-    'wav2vec-bert': AutoFeatureExtractor.from_pretrained('facebook/w2v-bert')
+    'wav2vecbert': AutoFeatureExtractor.from_pretrained('facebook/w2v-bert-2.0')
 }
 class BaseDataset(Dataset, ABC):
     def __init__(self, config:DatasetConfig) -> None:
@@ -45,6 +45,7 @@ class BaseDataset(Dataset, ABC):
 
         if orig_sr != self.sample_rate:
             audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=self.sample_rate)
+        audio = audio[:int(self.sample_rate * self.config.max_audio_length_ms * 0.001)]
         return audio
 
 
@@ -101,6 +102,8 @@ class StreamingBaseDataset(IterableDataset, ABC):
 
         if orig_sr != self.sample_rate:
             audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=self.sample_rate)
+
+        audio = audio[:int(self.sample_rate * self.config.max_audio_length_ms * 0.001)]
         return audio
 
 

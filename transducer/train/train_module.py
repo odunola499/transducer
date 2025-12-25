@@ -1,5 +1,8 @@
 import math
-from typing import Any, Dict, Optional, Tuple
+import os
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, List
+from datetime import datetime
 
 import torch
 import torch.distributed as dist
@@ -17,6 +20,7 @@ from rich.table import Table
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
+from safetensors.torch import save_file
 
 from transducer.models import BaseModel
 from transducer.train.commons import OPTIMIZERS, SCHEDULERS
@@ -74,7 +78,7 @@ class TrainModule:
 
         self.train_loader = self._configure_loader(train_loader, shuffle=True)
         self.valid_loader = (
-            self._configure_loader(valid_loader, shuffle=False) if valid_loader else None
+            self._configure_loader(valid_loader, shuffle=False) if valid_loader is not None else None
         )
 
         self.scaler = torch.cuda.amp.GradScaler(enabled=config.precision == "fp16")
@@ -84,6 +88,17 @@ class TrainModule:
         self.global_step = 0
         self.configure_optimizers()
         self._setup_wandb()
+        self._init_checkpointing()
+        self.best_checkpoints: List[Tuple[float, Path]] = []
+
+    def _init_checkpointing(self) -> None:
+        self.checkpoint_dir = Path(self.config.checkpoint_dir).expanduser()
+        if self.rank == 0 and self.config.enable_checkpointing:
+            self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        self.monitor_metric = self.config.monitor
+        self.save_top_k = max(0, int(self.config.save_top_k))
+        # By default, lower is better for loss/wer.
+        self.monitor_mode_min = True
 
     def _configure_loader(self, loader: DataLoader, shuffle: bool) -> DataLoader:
         if not is_dist():
@@ -105,7 +120,7 @@ class TrainModule:
                 collate_fn=loader.collate_fn,
                 sampler=sampler,
             )
-        if isinstance(dataset, IterableDataset):
+        elif isinstance(dataset, IterableDataset):
             return loader
         raise ValueError("Unsupported dataset type for distributed loader")
 
@@ -131,7 +146,8 @@ class TrainModule:
         if self.config.log_to != "wandb":
             return
 
-        run_name = f"{self.config.wandb_name}_r{self.rank}"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_name = f"{self.config.wandb_name}_{timestamp}_r{self.rank}"
         group_name = self.config.wandb_name
         self.wandb = wandb
         self.wandb_run = wandb.init(
@@ -147,19 +163,26 @@ class TrainModule:
             return
         self.wandb_run.log(metrics, step=self.global_step)
 
+    def _log_predictions_wandb(self, name: str, preds: list[str], targets: list[str]) -> None:
+        if self.wandb_run is None or not preds or not targets:
+            return
+        table = self.wandb.Table(columns=["pred", "target"])
+        for p, t in zip(preds, targets):
+            table.add_data(p, t)
+        self.wandb_run.log({name: table}, step=self.global_step)
+
     def _move_batch(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         moved = {}
         for key, value in batch.items():
             if key == "indices":
                 continue
             if key == "texts":
-                moved[key] = value
                 continue
             if isinstance(value, torch.Tensor):
                 moved[key] = value.to(self.device, non_blocking=True)
             else:
                 moved[key] = value
-        return moved
+        return moved  
 
     def _decode_texts(self, labels: torch.Tensor, label_lens: torch.Tensor) -> list[str]:
         tokenizer = self.raw_model.get_tokenizer()
@@ -205,9 +228,18 @@ class TrainModule:
         table.add_row("Accumulation", str(self.config.accumulate_grad_batches))
         table.add_row("DDP", "on" if is_dist() else "off")
         self.console.print(table)
+        checkpoint_mode = "on" if self.config.enable_checkpointing else "off"
+        table = Table(title="Checkpointing")
+        table.add_column("Item")
+        table.add_column("Value")
+        table.add_row("Enabled", checkpoint_mode)
+        table.add_row("Monitor", self.config.monitor)
+        table.add_row("Save Top K", str(self.config.save_top_k))
+        table.add_row("Dir", str(self.checkpoint_dir))
+        self.console.print(table)
 
     def _validate(self, max_batches: Optional[int] = None) -> Dict[str, float]:
-        if not self.valid_loader:
+        if self.valid_loader is None:
             return {}
         self.model.eval()
         total_loss = 0.0
@@ -215,19 +247,28 @@ class TrainModule:
         num_batches = 0
         with torch.no_grad():
             for batch_idx, batch in enumerate(self.valid_loader):
-                batch = self._move_batch(batch)
+                for_forward_pass = self._move_batch(batch)
                 with torch.autocast(
                     device_type=self.device.type,
                     dtype=self.autocast_dtype,
                     enabled=self.autocast_enabled,
                 ):
-                    outputs = self.model(**batch)
+                    outputs = self.model(**for_forward_pass)
                     loss = outputs["loss"]
                 total_loss += loss.item()
 
-                preds = self._predict_texts(batch["audio_features"])
+                preds = self._predict_texts(for_forward_pass["audio_features"])
                 targets = self._get_target_texts(batch)
                 total_wer += wer(targets, preds)
+                if (
+                    self.rank == 0
+                    and batch_idx == 0
+                    and self.config.max_print_predictions > 0
+                ):
+                    show_preds = preds[: self.config.max_print_predictions]
+                    show_targets = targets[: self.config.max_print_predictions]
+                    self._print_predictions(show_preds, show_targets)
+                    self._log_predictions_wandb("val/predictions", show_preds, show_targets)
                 num_batches += 1
 
                 if max_batches and num_batches >= max_batches:
@@ -268,7 +309,7 @@ class TrainModule:
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
-        if self.valid_loader and self.config.num_sanity_val_steps:
+        if self.valid_loader is not None and self.config.num_sanity_val_steps:
             metrics = self._validate(max_batches=self.config.num_sanity_val_steps)
             if self.rank == 0 and metrics:
                 self.console.print(
@@ -313,13 +354,13 @@ class TrainModule:
                 if self.global_step >= self.config.max_steps:
                     break
                 batch_indices = batch.get("indices")
-                batch = self._move_batch(batch)
+                for_forward_pass = self._move_batch(batch)
                 with torch.autocast(
                     device_type=self.device.type,
                     dtype=self.autocast_dtype,
                     enabled=self.autocast_enabled,
                 ):
-                    outputs = self.model(**batch)
+                    outputs = self.model(**for_forward_pass)
                     loss = outputs["loss"] / acc_steps
 
                 if self.scaler.is_enabled():
@@ -369,7 +410,7 @@ class TrainModule:
                         and self.global_step % self.config.print_predictions_every_num_steps == 0
                         and self.rank == 0
                     ):
-                        preds = self._predict_texts(batch["audio_features"])
+                        preds = self._predict_texts(for_forward_pass["audio_features"])
                         targets = self._get_target_texts(batch)
                         self._print_predictions(
                             preds[: self.config.max_print_predictions],
@@ -377,7 +418,7 @@ class TrainModule:
                         )
 
                     if (
-                        self.valid_loader
+                        self.valid_loader is not None
                         and self.config.check_val_every_num_steps
                         and self.global_step % self.config.check_val_every_num_steps == 0
                     ):
@@ -389,6 +430,7 @@ class TrainModule:
                                     f"val/wer_rank_{self.rank}": metrics["val_wer"],
                                 }
                             )
+                            self._maybe_checkpoint(metrics)
                         if self.rank == 0 and metrics:
                             loss_key = "val_loss_global" if "val_loss_global" in metrics else "val_loss"
                             wer_key = "val_wer_global" if "val_wer_global" in metrics else "val_wer"
@@ -420,3 +462,59 @@ class TrainModule:
 
         if progress is not None:
             progress.stop()
+
+    def _select_monitor_value(self, metrics: Dict[str, float]) -> Optional[float]:
+        key = self.monitor_metric
+        if key not in metrics:
+            # prefer global variant when monitoring val metrics
+            if key == "val_wer" and "val_wer_global" in metrics:
+                return metrics["val_wer_global"]
+            if key == "val_loss" and "val_loss_global" in metrics:
+                return metrics["val_loss_global"]
+            return None
+        return metrics[key]
+
+    def _should_save_checkpoint(self, monitor_value: float) -> bool:
+        if self.save_top_k == 0:
+            return False
+        if not self.best_checkpoints:
+            return True
+        if len(self.best_checkpoints) < self.save_top_k:
+            return True
+        worst = max(self.best_checkpoints, key=lambda x: x[0]) if self.monitor_mode_min else min(
+            self.best_checkpoints, key=lambda x: x[0]
+        )
+        if self.monitor_mode_min:
+            return monitor_value < worst[0]
+        return monitor_value > worst[0]
+
+    def _maybe_checkpoint(self, metrics: Dict[str, float]) -> None:
+        if not self.config.enable_checkpointing or self.rank != 0:
+            return
+        monitor_value = self._select_monitor_value(metrics)
+        if monitor_value is None:
+            return
+        if not self._should_save_checkpoint(monitor_value):
+            return
+
+        filename = (
+            f"checkpoint_step{self.global_step}_"
+            f"{self.monitor_metric}_{monitor_value:.4f}.safetensors"
+        )
+        path = self.checkpoint_dir / filename
+        save_payload = {
+            "model_state_dict": self.raw_model.state_dict(),
+            "step": self.global_step,
+            "monitor": monitor_value,
+        }
+        save_file(save_payload, path)
+
+        self.best_checkpoints.append((monitor_value, path))
+        if len(self.best_checkpoints) > self.save_top_k:
+            self.best_checkpoints.sort(key=lambda x: x[0], reverse=not self.monitor_mode_min)
+            while len(self.best_checkpoints) > self.save_top_k:
+                _, remove_path = self.best_checkpoints.pop(-1)
+                try:
+                    remove_path.unlink(missing_ok=True)
+                except OSError:
+                    pass

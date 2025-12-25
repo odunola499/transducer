@@ -21,7 +21,7 @@ class Processor:
     ):
         if sampling_rate is not None:
             kwargs["sampling_rate"] = sampling_rate
-        return self.feature_extractor(audio, return_tensors=return_tensors, **kwargs)
+        return self.feature_extractor(audio, return_tensors=return_tensors, padding = True, **kwargs)
 
     def tokenize(self, text):
         return self.tokenizer.encode(text)

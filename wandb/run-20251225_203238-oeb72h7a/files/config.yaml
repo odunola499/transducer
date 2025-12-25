@@ -1,0 +1,64 @@
+_wandb:
+    value:
+        cli_version: 0.23.1
+        e:
+            sudttbz9bn91myll4f8zlgbu1dhxfcu8:
+                args:
+                    - --config
+                    - conf/config_wav2vec2_small.yaml
+                cpu_count: 64
+                cpu_count_logical: 128
+                cudaVersion: "12.8"
+                disk:
+                    /:
+                        total: "128849018880"
+                        used: "11872055296"
+                email: jenrola2292@gmail.com
+                executable: /root/transducer/.venv/bin/python3
+                git:
+                    commit: 5fb7ad1c970664438c4ef1a12dbe54c45e604139
+                    remote: https://github.com/odunola499/transducer.git
+                gpu: NVIDIA RTX A5000
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 8192
+                      memoryTotal: "25757220864"
+                      name: NVIDIA RTX A5000
+                      uuid: GPU-230ef634-9fe9-fb37-8966-294b6387f719
+                host: d98e8dfdaca3
+                memory:
+                    total: "270069317632"
+                os: Linux-6.8.0-40-generic-x86_64-with-glibc2.35
+                program: -m transducer.train.run
+                python: CPython 3.11.11
+                root: /root/transducer
+                startedAt: "2025-12-25T20:32:38.025936Z"
+                writerId: sudttbz9bn91myll4f8zlgbu1dhxfcu8
+        m: []
+        python_version: 3.11.11
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 51
+                - 53
+            "2":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 51
+                - 53
+            "3":
+                - 13
+                - 61
+            "4": 3.11.11
+            "5": 0.23.1
+            "6": 4.57.3
+            "10":
+                - 20
+            "12": 0.23.1
+            "13": linux-x86_64

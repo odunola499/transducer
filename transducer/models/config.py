@@ -103,7 +103,8 @@ class ModelConfig(Args):
     loss_type:Literal['tdt','rnnt'] = 'rnnt'
     loss_duration:Optional[list[StrictInt]] = None
     fastemit_lambda: StrictFloat = 0.0
-    blank_id: StrictInt = 0
+    # If None, blank_id will be set to decoder_config.vocab_size (i.e., after tokens).
+    blank_id: Optional[StrictInt] = None
     loss_reduction:Literal['sum','mean'] = 'sum'
     sampler_type:Literal['greedy_search','beam_search'] = 'greedy_search'
     encoder_config: Wav2VecSmallConfig | Wav2VecLargeConfig | Wav2Vec2BertConfig

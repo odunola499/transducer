@@ -8,9 +8,10 @@ from transducer.models.config import DecoderConfig
 
 
 class RNNPredictor(Predictor):
-    def __init__(self, config: DecoderConfig):
+    def __init__(self, config: DecoderConfig, vocab_size: Optional[int] = None):
         super().__init__()
-        self.text_embed = nn.Embedding(config.vocab_size, config.embed_dim)
+        effective_vocab_size = vocab_size if vocab_size is not None else config.vocab_size
+        self.text_embed = nn.Embedding(effective_vocab_size, config.embed_dim)
         self.rnn_type = config.rnn_type
         if 'gru' in config.rnn_type:
 
@@ -34,6 +35,7 @@ class RNNPredictor(Predictor):
 
         self.proj = nn.Linear(config.hidden_dim, config.pred_dim)
         self.config = config
+        self.vocab_size = effective_vocab_size
 
     def forward(self, input_ids: Tensor, state: Optional[Tensor] = None):
         input_embeds = self.text_embed(input_ids)

@@ -22,10 +22,9 @@ class Args(BaseModel):
         return self.model_dump_json()
     
 def _ensure_forward_refs():
-    # Deferred imports to avoid circular dependency when downstream config modules import Args.
-    from transducer.dataset.config import DatasetConfig  # type: ignore
-    from transducer.models.config import ModelConfig  # type: ignore
-    from transducer.train.config import TrainConfig  # type: ignore
+    from transducer.dataset.config import DatasetConfig
+    from transducer.models.config import ModelConfig
+    from transducer.train.config import TrainConfig
 
     globals().update(
         TrainConfig=TrainConfig,

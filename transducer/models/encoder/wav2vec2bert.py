@@ -2,6 +2,7 @@ from typing import Optional
 
 import torch
 from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
 from torch import Tensor, nn
 
 from transducer.commons import Encoder
@@ -293,6 +294,8 @@ class Wav2Vec2BertModel(Encoder):
             self.masked_spec_embed = None
         self.encoder = Wav2Vec2BertEncoder(config)
 
+        self._load_hf_weights()
+
     def _mask_hidden_states(
         self,
         hidden_states: Tensor,
@@ -335,11 +338,12 @@ class Wav2Vec2BertModel(Encoder):
     def _load_hf_weights(
         self, load_into_params: bool = True, repo_id: str = "facebook/w2v-bert-2.0"
     ):
-        local_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
-        weights = torch.load(local_path, map_location="cpu")
+        local_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+        weights = load_file(local_path)
         weights = remap_hf_state_dict_wav2vec2bert(weights)
         if load_into_params:
             self.load_state_dict(weights, strict=False)
+            print("Loaded pretrained wav2vecbert weights")
         return weights
 
     def encoder_name(self):

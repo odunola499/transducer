@@ -7,7 +7,7 @@ import torch.distributed as dist
 from rich.console import Console
 
 from transducer.config import Config
-from transducer.dataset import HFDataset, JsonlDataset
+from transducer.dataset import StreamingHFDataset,HFDataset, JsonlDataset
 from transducer.dataset.config import DatasetConfig, HFDatasetStruct, JsonlDatasetStruct
 from transducer.models import DawnModel
 from transducer.train.train_module import TrainModule
@@ -35,6 +35,15 @@ def _build_dataloaders(config: DatasetConfig, train_batch_size: int, eval_batch_
             raise ValueError("val_data must be HFDatasetStruct when dataset_type='hf'.")
         train_dataset = HFDataset(train_data, config)
         val_dataset = HFDataset(val_data, config)
+    
+    elif config.dataset_type == 'stream_hf':
+        if not isinstance(train_data, HFDatasetStruct):
+            raise ValueError("train_data must be HFDatasetStruct when dataset_type='stream_hf'.")
+        if not isinstance(val_data, HFDatasetStruct):
+            raise ValueError("val_data must be HFDatasetStruct when dataset_type='stream_hf'.")
+        train_dataset = StreamingHFDataset(train_data, config)
+        val_dataset = StreamingHFDataset(val_data, config)
+        
     elif config.dataset_type == "jsonl":
         if not isinstance(train_data, JsonlDatasetStruct):
             raise ValueError("train_data must be JsonlDatasetStruct when dataset_type='jsonl'.")

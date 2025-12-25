@@ -3,9 +3,10 @@ from torch import Tensor
 from typing import Optional
 
 from transducer.models.base import BaseModel
-from transducer.models.config import ModelConfig
+from transducer.models.config import ModelConfig, Wav2Vec2BertConfig, Wav2VecConfig
 from transducer.losses import LOSSES
 from transducer.models.decoder.rnnt import SimpleJoiner, RNNPredictor
+from transducer.models.encoder.wav2vec import Wav2VecModel
 from transducer.models.encoder.wav2vec2bert import Wav2Vec2BertModel
 from transducer.samplers import GenerationMixin
 
@@ -13,7 +14,14 @@ class DawnModel(BaseModel, GenerationMixin):
     def __init__(self, vocab_size:int, config: ModelConfig):
         super().__init__(config)
         self.model_name = config.model_name
-        self.blank_id = config.blank_id
+        # Place blank token at the end of the vocabulary space
+        base_vocab_size = config.decoder_config.vocab_size
+        self.blank_id = base_vocab_size if config.blank_id is None else config.blank_id
+        if self.blank_id != base_vocab_size:
+            raise ValueError(
+                f"blank_id ({self.blank_id}) must equal decoder vocab_size ({base_vocab_size})"
+            )
+        self.vocab_size_with_blank = base_vocab_size + 1
 
         LOSS = LOSSES[config.loss_type]
         if config.loss_type == 'tdt':
@@ -27,10 +35,16 @@ class DawnModel(BaseModel, GenerationMixin):
         encoder_config = config.encoder_config
         decoder_config = config.decoder_config
 
-        self.encoder = Wav2Vec2BertModel(encoder_config)
-        self.predictor = RNNPredictor(decoder_config)
+        # Select encoder based on provided config class
+        if isinstance(encoder_config, Wav2Vec2BertConfig):
+            self.encoder = Wav2Vec2BertModel(encoder_config)
+        elif isinstance(encoder_config, Wav2VecConfig):
+            self.encoder = Wav2VecModel(encoder_config)
+        else:
+            raise ValueError(f"Unsupported encoder_config type: {type(encoder_config)}")
+        self.predictor = RNNPredictor(decoder_config, vocab_size=self.vocab_size_with_blank)
         self.joiner = SimpleJoiner(
-            vocab_size,
+            self.vocab_size_with_blank,
             encoder_dim=encoder_config.hidden_size,
             config=decoder_config
         )
@@ -67,10 +81,11 @@ class DawnModel(BaseModel, GenerationMixin):
         }
 
     def compute_loss(self, lattice:Tensor, labels:Tensor, act_lens:Tensor, label_lens:Tensor):
-        return self.loss_func(
-            acts = lattice,
-            labels = labels,
-            label_lens = label_lens,
-            act_lens = act_lens,
-        )
-
+        lattice = lattice.float()
+        with torch.autocast(device_type=lattice.device.type, enabled=False):
+            return self.loss_func(
+                acts=lattice,
+                labels=labels,
+                label_lens=label_lens,
+                act_lens=act_lens,
+            )

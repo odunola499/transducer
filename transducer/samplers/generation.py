@@ -109,7 +109,7 @@ class GenerationMixin(ABC):
             t += 1
             results.append(hyp)
         results = torch.concat(results, dim=-1)
-        texts = tokenizer.decode(results)
+        texts = tokenizer.decode(results.to('cpu').tolist())
 
         return GenerationOutput(ids=results, labels=texts)
 
@@ -132,11 +132,13 @@ class GenerationMixin(ABC):
             max_symbols -= 1
             logits = joiner(frame, pred_out)
             ids = logits.argmax(-1)
-            ids = ids.squeeze(-1).squeeze(-1)
+            ids = ids.reshape(ids.shape[0], -1)
+            ids = ids[:, -1]
             if (ids == blank_id).all():
                 break
 
             hyp.append(ids.unsqueeze(-1))
+
             pred_out, pred_state = predictor.step(ids, state=pred_state)
 
         if hyp:

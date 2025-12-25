@@ -3,6 +3,7 @@ from transducer.dataset.base import BaseDataset, StreamingBaseDataset
 from transducer.dataset.config import DatasetConfig, HFDatasetStruct
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
+import torch
 
 
 class HFDataset(BaseDataset):
@@ -30,7 +31,7 @@ class HFDataset(BaseDataset):
         text = self.processor.tokenize(raw_text)
         return {
             'audio': audio,
-            'text': text,
+            'text': torch.tensor(text, dtype = torch.long),
             'raw_text': raw_text,
             'index': idx,
         }
@@ -44,10 +45,12 @@ class HFDataset(BaseDataset):
         features = self.processor.extract_features(
             audios, sampling_rate=self.sample_rate, return_tensors='pt'
         )
-        if isinstance(features, dict):
-            features = features["input_values"]
-        else:
-            features = features.input_values
+
+        if 'input_features' in features:
+            features = features["input_features"]
+        elif 'input_values' in features:
+            features = features['input_values']
+
         # Lazy, for features just take all frames as important when computing loss, might help with silence actually
         labels = pad_sequence(texts, batch_first = True, padding_value=self.processor.pad_id)
         label_lens = (labels!=self.processor.pad_id).sum(dim = -1)
@@ -66,11 +69,11 @@ class HFDataset(BaseDataset):
 
         loader = DataLoader(
             self,
-            batch_size = batch_size,
-            shuffle = True,
-            num_workers = num_workers,
-            pin_memory = pin_memory,
-            collate_fn = self._collate_fn,
+            batch_size=batch_size,
+            shuffle=False,  # IterableDataset; shuffling handled by streaming source if needed
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            collate_fn=self._collate_fn,
         )
         return loader
 
@@ -99,7 +102,7 @@ class StreamingHFDataset(StreamingBaseDataset):
             text = self.processor.tokenize(raw_text)
             yield {
                 'audio': audio,
-                'text': text,
+                'text': torch.tensor(text, dtype = torch.long),
                 'raw_text': raw_text,
                 'index': index,
             }
@@ -113,10 +116,10 @@ class StreamingHFDataset(StreamingBaseDataset):
         features = self.processor.extract_features(
             audios, sampling_rate=self.sample_rate, return_tensors='pt'
         )
-        if isinstance(features, dict):
-            features = features["input_values"]
-        else:
-            features = features.input_values
+        if 'input_features' in features:
+            features = features["input_features"]
+        elif 'input_values' in features:
+            features = features['input_values']
         # Lazy, for features just take all frames as important when computing loss, might help with silence actually
         labels = pad_sequence(texts, batch_first = True, padding_value=self.processor.pad_id)
         label_lens = (labels!=self.processor.pad_id).sum(dim = -1)
@@ -136,7 +139,7 @@ class StreamingHFDataset(StreamingBaseDataset):
         loader = DataLoader(
             self,
             batch_size = batch_size,
-            shuffle = True,
+            shuffle = False,
             num_workers = num_workers,
             pin_memory = pin_memory,
             collate_fn = self._collate_fn,

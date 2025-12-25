@@ -3,6 +3,6 @@ from transducer.losses.tdt.tdt_loss import TDTLoss
 
 
 LOSSES = {
-    'tdt':'TDTLoss',
-    'rnnt':'RNNTLoss',
+    'tdt':TDTLoss,
+    'rnnt':RNNTLoss,
 }

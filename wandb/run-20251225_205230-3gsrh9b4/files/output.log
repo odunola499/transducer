@@ -1,0 +1,798 @@
+[3m        Training Summary         [0m
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃[1m [0m[1mItem            [0m[1m [0m┃[1m [0m[1mValue     [0m[1m [0m┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ Model            │ DawnModel  │
+│ Total Params     │ 96,555,329 │
+│ Trainable Params │ 96,555,329 │
+│ Precision        │ bf16       │
+│ Accumulation     │ 4          │
+│ DDP              │ off        │
+└──────────────────┴────────────┘
+[3m       Checkpointing        [0m
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃[1m [0m[1mItem      [0m[1m [0m┃[1m [0m[1mValue      [0m[1m [0m┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Enabled    │ off         │
+│ Monitor    │ val_wer     │
+│ Save Top K │ 1           │
+│ Dir        │ checkpoints │
+└────────────┴─────────────┘
+/root/transducer/.venv/lib/python3.11/site-packages/numba/cuda/dispatcher.py:536: NumbaPerformanceWarning: Grid size 4 will likely result in GPU under-utilization due to low occupancy.
+  warn(NumbaPerformanceWarning(msg))
+/root/transducer/.venv/lib/python3.11/site-packages/numba/cuda/dispatcher.py:536: NumbaPerformanceWarning: Grid size 1 will likely result in GPU under-utilization due to low occupancy.
+  warn(NumbaPerformanceWarning(msg))
+[3m                        Sample Predictions                         [0m
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃[1m [0m[1mPred                          [0m[1m [0m┃[1m [0m[1mTarget                        [0m[1m [0m┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ retretretretret sc sc uh uh uh │ you wanna introduce yourself   │
+│ uh inf inf inf                 │ shanghai with abby at telecom  │
+│ infannannretannret sc sc sc sc │                                │
+│ sc num num num num             │                                │
+│ numretretretretret             │                                │
+│ ratannannannannww sc sc sc sc  │                                │
+│ sc sc sc sc num num num num    │                                │
+│ numret bro bro bro             │                                │
+│ broretretretrettt wor wor wor  │                                │
+│ worersers ratersers rat rat    │                                │
+│ bro bro                        │                                │
+│ guyretretretretretardsardsards │                                │
+│ ratardsardsardsardsardsards    │                                │
+│ all all all all all bro bro    │                                │
+│ bro bro brocomcomcomcomcom sc  │                                │
+│ scizedizedizedowsowswww        │                                │
+│ allisttern                     │                                │
+│ womternoutoutoutoutoutereeree… │                                │
+│ num num                        │                                │
+│ numcomcomcomcomcomretretretre… │                                │
+│ rat rat                        │                                │
+│ ratereereretretretretretundre… │                                │
+│ rat rat bro broents bro        │                                │
+│ broretret rat rat rat rat rat  │                                │
+│ ratretret ratret inf rat rat   │                                │
+│ inf ratretretretretret sc sc   │                                │
+│ sc sc aircomcomcomcomcom rat   │                                │
+│ rat rat rat                    │                                │
+│ ratizedizedizedizedized sc sc  │                                │
+│ sc sc sc worular wor wor wor   │                                │
+│ worpanypanyizedized all num    │                                │
+│ num num num num inf inf inf    │                                │
+│ inf mot motideo mot            │                                │
+│ broicalicalicalicalicalical    │                                │
+│ bro bro bro brocomecomecoere   │                                │
+│ sciicalicalicalicalicalcomcom  │                                │
+│ wom wom                        │                                │
+│ womowsereereereereereereereer… │                                │
+│ all all all sc sc sc sc sc dam │                                │
+│ ide ideararereundundere        │                                │
+│ raticalicalicalicalicaliteite… │                                │
+│ sc scardsucatucatucatucat wor  │                                │
+│ wor wor wor wor sl sl sl sl sl │                                │
+│ all all allw allwwwww ne ne ne │                                │
+│ ne                             │                                │
+│ necococococounchunchunchittit… │                                │
+│ all all all all                │                                │
+│ alloneoneizedizedizedretretre… │                                │
+│ rat ratizedizedized ear ear    │                                │
+│ quoneoneone qu qu qu           │                                │
+│ quternterntern all allill rat  │                                │
+│ ratoutoutretretretretret wor   │                                │
+│ wor wor wor motadyadyadyadyady │                                │
+│ inf inf                        │                                │
+│ infoutoutideoideoideoideoideo  │                                │
+│ wom wom wom wom womoneone num  │                                │
+│ num numcomcomcomcomcom         │                                │
+│ sloutoutoutoutironiron inf inf │                                │
+│ inf huoutout worout all all    │                                │
+│ rat all rat infcocococo sc rat │                                │
+│ rat sc sc y y y y              │                                │
+│ ratctoritalitalitalitalicalic… │                                │
+│ inf infretretretretret rat rat │                                │
+│ rat rat rat won won won won    │                                │
+│ won red red red red            │                                │
+│ redicalretretretret sc sc sc   │                                │
+│ sc sc ratoutoutoutout num num  │                                │
+│ allicalicalcus ear ear ear     │                                │
+│ huicalouticalicalicaloneyoney… │                                │
+│ sch sch sch sch                │                                │
+│ schizedittideoideolesicalical… │                                │
+│ lot lotosedosed lot broco bro  │                                │
+│ bro bro bro bro infersers wor  │                                │
+│ wor damcoco rat rat rat rat    │                                │
+│ rat bro bro bro bro bro bro    │                                │
+│ broundundundretretretretret sc │                                │
+│ sc sc sc sc rat sc sc sc       │                                │
+│ scerecom bro bro bro rat rat   │                                │
+│ rat rat ratretretandsandsands  │                                │
+│ rat rat all all all sc sc sc   │                                │
+│ sccom rat rat rat rat          │                                │
+│ infretretretretretcoizedizedi… │                                │
+│ quco qu uhw all allw inf inf   │                                │
+│ inf inf inf scersersersers     │                                │
+│ airannannternternretoutoutout… │                                │
+│ numokokokok                    │                                │
+│ cercomcomcomcomcomcomcomcomret │                                │
+│ earret broretret rat rat rat   │                                │
+│ rat ratann ratannann rat rat   │                                │
+│ rat ratannann                  │                                │
+│ numartsartsartsarts all rat    │                                │
+│ ratretretretretretretellretre… │                                │
+│ bro bro bro bro                │                                │
+│ broundundundundunditeiteite    │                                │
+│ airoutcom rat rat rat          │                                │
+│ ratretretretoneoneideoretretr… │                                │
+│ sc sc sc sc sc sc inf sc sc    │                                │
+│ his sc sc sc sc sccome sc sc   │                                │
+│ scecococo dam dam              │                                │
+│ broicalicalicalicalosedone ide │                                │
+│ ide ide sc scretretret huco sc │                                │
+│ scco rat rat rat cer           │                                │
+│ cercomcomcom rat ratcomcom inf │                                │
+│ inf inf uh uh uh uh            │                                │
+│ uhretretretretret rat rat      │                                │
+│ raters rat ide sc rat rat      │                                │
+│ ratcomcom sc sc sc im dam dam  │                                │
+│ rat rat rat rat rat sc sc uh   │                                │
+│ sc wor wor wor rat rat p rat   │                                │
+│ rat scternternternternco rat   │                                │
+│ rat rat rat all all            │                                │
+│ allcomcomoutout all all        │                                │
+│ allowsows uhannann sc sc sc sl │                                │
+│ sl num all all all all sc sev  │                                │
+│ sev sev sev sc sc sc sc        │                                │
+│ scretretretretret ear rat rat  │                                │
+│ rat rat                        │                                │
+│ numicalicalicalicalundundundu… │                                │
+│ est est inf infows sc sc sc sc │                                │
+│ scicalicalowsowsowsgetoutouto… │                                │
+│ sc scicalicalicalicalicalical  │                                │
+│ ratryry num num numret         │                                │
+│ sccomized                      │                                │
+│ broicalicalicalicalical y sc   │                                │
+│ mot inf mot sc sc sc sc sc ide │                                │
+│ ide ide                        │                                │
+│ ideicalcocococoizedicalicalic… │                                │
+│ rat god god god rat par inf    │                                │
+│ inf inf inf inf inf im im im   │                                │
+│ qu qu qu qu qu qu qu qu qu     │                                │
+│ qucomizedizedizedizedpecipeci  │                                │
+│ wom wom womadyadyadyadyady rel │                                │
+│ inf bro bro inf sc sc sc wom   │                                │
+│ scternternternternterncomee in │                                │
+│ ide ratretretannannretcom inf  │                                │
+│ inf inf                        │                                │
+│ infintsizedizedironironretret… │                                │
+│ rat raticalical sc sc sc sc    │                                │
+│ scretretretretret bro bro sc   │                                │
+│ sc sc worideoideoideoideo inf  │                                │
+│ infone infoneicalical rat      │                                │
+│ raticaloneoneoneoneical        │                                │
+│ hisideoideoideoideoerer wor    │                                │
+│ worady wor wor wor wor wor run │                                │
+│ sc sc scer bro bro cr cr       │                                │
+│ crizedicalicalicalical bro wor │                                │
+│ wor hu bro                     │                                │
+│ sccomcomcomcomicalicalretretr… │                                │
+│ sc scideoicalideo              │                                │
+│ scitalitalitalitalicalereeree… │                                │
+│ wom sc sc wom sc wor wor wor   │                                │
+│ wor woricalical sc sc          │                                │
+│ scizedcocococo                 │                                │
+│ slizedideoideoideoicalicalica… │                                │
+│ wor wor wor                    │                                │
+│ worretundundundundundideoideo… │                                │
+│ hisicalasedasedasedasedized sc │                                │
+│ sc sc scinatinatinat sc sc sc  │                                │
+│ sc sc sc sc wor                │                                │
+│ worundizedizedryryry ratry rat │                                │
+│ rat dam dam dam                │                                │
+│ huundicalicalicaloneicalicali… │                                │
+│ ear ear earizedizedretard      │                                │
+│ broardardoneyoneyretretoneyco… │                                │
+│ sc sc sc sc scicalicalicalical │                                │
+│ sconeone hu hu hu hu sc sc sc  │                                │
+│ sconeererererizedizedideoberi… │                                │
+│ sconeoneoneoneoneoneicalicali… │                                │
+│ hu huoneone sc sc sc scical sc │                                │
+│ sc sc sc hu hu hu hu hu        │                                │
+│ huicalical his his             │                                │
+│ hisicalizedizedizedizedizediz… │                                │
+│ scideoideoideoicalicalideo sc  │                                │
+│ scitalone sc hu                │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc sc sc sc sc scerer          │                                │
+│ worideoideoideoideoicalicalic… │                                │
+│ hu hu hu hu sc sc sc           │                                │
+│ scicaloneicalicalicaloneoutiz… │                                │
+│ hu sc sc sc                    │                                │
+│ scerideoicalicalicalicalicali… │                                │
+│ hu hu huicalicalinatinatinat   │                                │
+│ scicalicalicalicalideoicalica… │                                │
+│ sc sc sc hu sc scicalical sc   │                                │
+│ sc scone sc sc scicaler sc sc  │                                │
+│ sc sc sc                       │                                │
+│ scicalicalicalicaloneoneoneon… │                                │
+│ sc sc sc sc sc sc sc sc scere  │                                │
+│ sconeoneoneicalicalical hu     │                                │
+│ huical sc sc sc                │                                │
+│ scereereizedizedizedizedizedi… │                                │
+│ hu hu hu hu hu huicaloneoneone │                                │
+│ his hisereereere               │                                │
+│ sconeoneoneoneoneoneoneoneone  │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc sc sc sc sconeoneoneoneideo │                                │
+│ sc sc hu hu                    │                                │
+│ huicalicalicalicalizedical cr  │                                │
+│ cr cr sc sc sc                 │                                │
+│ scicalicalicalicalicalicalone… │                                │
+│ scicalicalicalone              │                                │
+│ scicalicaloneicaloneoneoneone… │                                │
+│ sc scical                      │                                │
+│ scicalicalizedizedizedicalical │                                │
+│ scical sc sc sc sc sc sc sc sc │                                │
+│ sc sc sc sc                    │                                │
+│ huicalicalicalicalical sc      │                                │
+│ scical sc scical               │                                │
+│ scicalicaloneoneoneoneicalica… │                                │
+│ scicaloneideoideoideoideoideo… │                                │
+│ sc sc sc                       │                                │
+│ scicaloneicalicalererer sc     │                                │
+│ scicalicalical sc sc           │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ hu scical sc sc sc sc sc       │                                │
+│ scicalicalical                 │                                │
+│ scicalicalicalicalicalical sc  │                                │
+│ sc sc sc                       │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc sc sc sc sc sc sc sc        │                                │
+│ scicalicalicalizedizedizedize… │                                │
+│ sc sc sc sc sc sc sc sc sc sc  │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ huicalicalicalicaloneicalical… │                                │
+│ scicalicalicalical sc          │                                │
+│ sconeoneicalicalicalicalicali… │                                │
+│ sc sc scideoer                 │                                │
+│ sconeicaloneoneicalical sc     │                                │
+│ scone sc sc sc                 │                                │
+│ scicalicalicalicalizedizedical │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ hu huical hu hu hu hu          │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ sc scical sc sc sc             │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ sc sc sc sc scical huical hu   │                                │
+│ sc sc sc sc sc sc hu hu hu     │                                │
+│ huicalical sc sc               │                                │
+│ sconeoneoneoneoneoneicalicali… │                                │
+│ sc sc sc scicalicalicalical hu │                                │
+│ hu hu huicalical hu sc sc sc   │                                │
+│ sc sc scical sc scicalicalical │                                │
+│ hu hu                          │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ huicaloneical sc sc sc sc      │                                │
+│ huone sc sc sc hu huical       │                                │
+│ huicalical hu hu hu            │                                │
+│ huicalicaloneoneoneoneicalica… │                                │
+│ sc sc sc huicalical sc sc      │                                │
+│ scicalical sc sc sc sc sc      │                                │
+│ scicalicalicalicalical         │                                │
+│ huicaloneicalicalicalicalical… │                                │
+│ sc sc scical                   │                                │
+│ scicaloneoneicalicalicalicali… │                                │
+│ sc sc sc sc                    │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc sc sc sc sc scical hu hu    │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ scicalicalicalicalicalicalical │                                │
+│ sc                             │                                │
+│ scicalicalicalizedizedizedize… │                                │
+│ huicalicalical                 │                                │
+│ scicalicalicalicalicalical sc  │                                │
+│ sc sc sc                       │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc sc sc sc sc hu hu           │                                │
+│ huicalicalone sc scone sc sc   │                                │
+│ sc sc sc sc huicaloneoneoneone │                                │
+│ sc sc                          │                                │
+│ huoneoneoneoneoneoneoneoneone… │                                │
+│ hu hu huicalicalicalicalone sc │                                │
+│ sc sc sc sc hu huical          │                                │
+│ huicalicalical hu huical sc sc │                                │
+│ sc sc                          │                                │
+│ sconeoneoneoneoneicalical hu   │                                │
+│ hu huical sc                   │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ hu hu hu huicalical sc sc      │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ hu huicalical hu hu hu hu hu   │                                │
+│ hu hu                          │                                │
+│ huicalicalicalicalicalizedica… │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ huicalicalone sc               │                                │
+│ scicalicalizedizedizedizedize… │                                │
+│ sc sc sc hu                    │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc sc huicalical hu hu hu hu   │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ scical huicalicalone sc sc     │                                │
+│ scicalicalicalicaloneone scone │                                │
+│ sc sc sc sc sc sc sc huical    │                                │
+│ huicalicalicalicalicalizedica… │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ scical sc sc sc sc sc sc sc    │                                │
+│ scicaloneoneoneicalicalicalic… │                                │
+│ hu hu huicalical hu hu hu hu   │                                │
+│ hu hu hu huicalical sc sc      │                                │
+│ scicalicalicalicalicaloneoneo… │                                │
+│ sc sc sc sc                    │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ scicalone sc sc                │                                │
+│ scicalicalicalicalizedizedize… │                                │
+│ sc sc hu scical sc scone sc sc │                                │
+│ hu hu scicalicalical sc        │                                │
+│ scicalicaloneoneoneoneone sc   │                                │
+│ scone sc sc sc sc sc           │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ scicalicalicalicalicalone sc   │                                │
+│ sc                             │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ hu                             │                                │
+│ huicalicalicalicalicalicalone… │                                │
+│ huicalical huicalical          │                                │
+│ huicalicalicalicalicalone sc   │                                │
+│ sc sc sc                       │                                │
+│ scicalicalicalicalicalideo sc  │                                │
+│ sc sc                          │                                │
+│ scicalicalicalicalicalone      │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc scicalicalicaloneoneoneone  │                                │
+│ sc sc                          │                                │
+│ huicalicalicalicaloneoneone sc │                                │
+│ sc sc huone sc scone sc sc hu  │                                │
+│ huical hu hu hu hu hu hu hu hu │                                │
+│ ide sc sc scicalicalical sc    │                                │
+│ scical scical huicalical hu hu │                                │
+│ hu hu ideone sc sc hu scical   │                                │
+│ scical scical hu hu hu sc hu   │                                │
+│ hu hu hu huicalical            │                                │
+│ huicalicalicalicalicalical     │                                │
+│ scicalicalicaloneical sc sc hu │                                │
+│ hu scicalical sc sc hu         │                                │
+│ huicaloneoneone sc sc sc hu    │                                │
+│ scical huicalical              │                                │
+│ huicalicalicalicalicalicalica… │                                │
+│ sc sc hu hu scicaloneone sc sc │                                │
+│ hu scicalical scone sc sc      │                                │
+│ scical scical scical scicalone │                                │
+│ sc sc hu sc sconeicalone sc sc │                                │
+│ hu hu scicalone sc             │                                │
+│ sconeicalical hu               │                                │
+│ scicalicalicalicalicalicalical │                                │
+│ huicalical huicalical          │                                │
+│ huicalical huical sc sc hu     │                                │
+│ scical huicalicalicaloneoneone │                                │
+│ sc scical huicalicalical       │                                │
+│ scicalone sc sc scical         │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc scical hu huical            │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ scicalone sc                   │                                │
+│ scicalicalicalicalicalicalone… │                                │
+│ sc scical                      │                                │
+│ huicalicalicalicalone          │                                │
+│ outout me me meideo bro bro    │ so momentarily i would like to │
+│ bro bro uh uh uhardsards rat   │ to do a round of introductions │
+│ bro bro bro bro bro rat rat    │ and hear where you're all      │
+│ rat ratannannannann inf        │ coming from what brought you   │
+│ scardardard bro rat sc sc sc   │ here                           │
+│ sc bro bro bro bro bro bro bro │                                │
+│ sc sc bro bro bro bro bro      │                                │
+│ broazazazazazpany air air air  │                                │
+│ air num num num rat raters bro │                                │
+│ raters bro rat inf inf inf     │                                │
+│ infretretretretretretretretow… │                                │
+│ rat rattaintain rat rat rat    │                                │
+│ rat rat sc bro bro sc bro bro  │                                │
+│ bro bro rat ratote bro bro bro │                                │
+│ bro sc sc sc sc sc inf inf inf │                                │
+│ inf inf sc sc sc sc sc bro bro │                                │
+│ bro rat rat bro                │                                │
+│ broretretretretretretretret    │                                │
+│ rat rat rat rat inf all all    │                                │
+│ num num                        │                                │
+│ numretretretretretannannannan… │                                │
+│ rat rat rat rat rat ag rat rat │                                │
+│ rat rat womundundundundund inf │                                │
+│ inf inf inf sc sc sc sc sc bro │                                │
+│ bro bro broows                 │                                │
+│ infundundardsards inf inf inf  │                                │
+│ inf inf mor uh rat rat         │                                │
+│ ratannannannannannoutoutoutou… │                                │
+│ pieretretret rat rat rat rat   │                                │
+│ rat rat rat rat rat ratgan rat │                                │
+│ rat rat                        │                                │
+│ ratretretretretretannannintsi… │                                │
+│ sc sc sc sc sc broretret sc    │                                │
+│ scco bro wor all               │                                │
+│ allicalicalicalicalicalows     │                                │
+│ estowsowsereersers ratretical  │                                │
+│ rat rat rat rat                │                                │
+│ ratandsretretretretical        │                                │
+│ joersersers rat rat rat rat    │                                │
+│ infards ratardsardsardsund bro │                                │
+│ bro bro bro jo inf inf inf     │                                │
+│ infretretretretret rat rat rat │                                │
+│ rat rat rat rat sc sc sc rat   │                                │
+│ rat ratistist rat rat rat rat  │                                │
+│ rat rat rat                    │                                │
+│ ratoutouticalitalitalperperer… │                                │
+│ inf inf inf inf inf inf inf    │                                │
+│ inf cer cer rat rat rat rat    │                                │
+│ ratanceanceanceanceance sc sc  │                                │
+│ sc sc scgetiteiteiteiteical    │                                │
+│ scicalicalicalideoretretreter… │                                │
+│ sc broretretret rat ratretret  │                                │
+│ rat sc sc sc sc sceretain num  │                                │
+│ num num sl slretretret mot mot │                                │
+│ his his hiser sc sc dam        │                                │
+│ scternereereereere rat rat bro │                                │
+│ bro broizedicalicalicalicalout │                                │
+│ all all all all rat all        │                                │
+│ allical                        │                                │
+│ allereicalereereereereereere   │                                │
+│ redbericaladyadyadyadyularular │                                │
+│ sc sc sc sc sc sc scoutopopone │                                │
+│ sc sc sc inf inf sc scretwwww  │                                │
+│ rat rat rat rat rat woroney    │                                │
+│ woroney wor sc sc screatreat   │                                │
+│ rat rat rat rat rat guy ear    │                                │
+│ ear ear ear cer cer            │                                │
+│ cerainainows inf inf inf       │                                │
+│ infryryretundundicalicalizedi… │                                │
+│ rat rat rat rat ratw bro bro   │                                │
+│ bro brooneone sc scone         │                                │
+│ scoutoutoutoutout              │                                │
+│ scoutoutoutere sc              │                                │
+│ scizedizedone                  │                                │
+│ brooneryryoneoneoneoneone sc   │                                │
+│ sc sc sc scicalicalicalout     │                                │
+│ broasedasedereereereereriron   │                                │
+│ wom womretretretretret rat rat │                                │
+│ rat rat rat ratretret sc sc sc │                                │
+│ sc sc sc scizedizedquizedized  │                                │
+│ bro bro bro bro                │                                │
+│ broadyereereereere air air air │                                │
+│ air air bro bro bro bro        │                                │
+│ broasedasedasedasedased scased │                                │
+│ hisased his rat rat rat rat    │                                │
+│ rat sc sc sc sc sc bro at at   │                                │
+│ at at                          │                                │
+│ numicalicalicalicalretoutouto… │                                │
+│ rat rat rat rat rat            │                                │
+│ histaintaintaintain rat rat    │                                │
+│ rat rat rat sc sc sc sc        │                                │
+│ scannannanngetget sc sc sc sc  │                                │
+│ sc bro bro ear ear ear num num │                                │
+│ inf sc inf sc sc sc sc scical  │                                │
+│ scical scicalwwwww sc sc sc sc │                                │
+│ sc his sc                      │                                │
+│ sciteiteiteiteiteiteite        │                                │
+│ scoutoutout                    │                                │
+│ scryryryryretereereere womere  │                                │
+│ bro bro scoutout sc sc sc sc   │                                │
+│ sccus womcuscus wom            │                                │
+│ infizedizedizedizedideoideoun… │                                │
+│ bro runicalundund num bro bro  │                                │
+│ bro broretretretretret sc sc   │                                │
+│ sc sc sc sc scased hu          │                                │
+│ huicalicalicalicalicalized sc  │                                │
+│ sc sc                          │                                │
+│ scicalicalicalicalicalitalita… │                                │
+│ sc sc scital sc sc sc scone    │                                │
+│ huout sc sc sc rat rat rat rat │                                │
+│ rate inf inf inf inf sc sc sc  │                                │
+│ sc sc bet bet sc sc sc         │                                │
+│ scasedasedasedased             │                                │
+│ numtaintaintaintainereereerei… │                                │
+│ crcomististist ear sc sc sc sc │                                │
+│ scoutoutoutoutout inf inf inf  │                                │
+│ inf infundoutoutoutout sc sc   │                                │
+│ sc sc sc wor hu hu hu wor wor  │                                │
+│ wor wor wor wor                │                                │
+│ numicalicalicalical sc sc sc   │                                │
+│ sc sc sc sc sc sc sc wom wom   │                                │
+│ bro bro bro sc sc sc sc sc sc  │                                │
+│ sc sc sc                       │                                │
+│ sconeoneereoneoneitalitalital… │                                │
+│ al al aloneitalone inf sc      │                                │
+│ infundicalicalicalicalicalica… │                                │
+│ inf inf inf inf                │                                │
+│ inficalicalicalicalical bro    │                                │
+│ bro bro bro                    │                                │
+│ brotaintaintaintaincom bro     │                                │
+│ broret bro bro rat rat rat rat │                                │
+│ ratllllllret                   │                                │
+│ scartsartsosedosedosedcom broi │                                │
+│ broi sc                        │                                │
+│ scoutizedizedizedizedizedized… │                                │
+│ scoutoutoutoutinat sc sc sc    │                                │
+│ uhretret dam damretoutoutout   │                                │
+│ cr cricalicalicalicalical hu   │                                │
+│ hu huicalicalberberberberber   │                                │
+│ run brory                      │                                │
+│ infryicalicaloneicalical qu qu │                                │
+│ qu bro bro wor wor wor wor wor │                                │
+│ num num num num rat bro bro    │                                │
+│ bro bro bro wor wor wor        │                                │
+│ brories rat rat rat rat        │                                │
+│ ratardsards rat ratards rat    │                                │
+│ rat rat rat rat                │                                │
+│ ratriedriedriedriedowsowsowso… │                                │
+│ uhretcomcom bro                │                                │
+│ broretretretretretret rat      │                                │
+│ ratizedizedized rat            │                                │
+│ ratoutoutoutoutout             │                                │
+│ sccomecomeququ sc sc sc sc sc  │                                │
+│ screticalicalical broretret    │                                │
+│ infretideoideoideoideoideoero… │                                │
+│ sc sc sc sc sc sc sc sc sc sc  │                                │
+│ sc sc sc                       │                                │
+│ scizedicalicalicalicalicalout… │                                │
+│ qu bro bro bro sc              │                                │
+│ scicalicalout sc sc sc sc      │                                │
+│ sconeonelesslesslessoutoutout… │                                │
+│ wor wor wor wor                │                                │
+│ woricalicalundundundereereere… │                                │
+│ huouticalicalouticalicalicali… │                                │
+│ bro bro rat rat rat rat wor    │                                │
+│ wor wor wor rat rat rat rat    │                                │
+│ rat rat rat rat rat rat inf    │                                │
+│ inf sc sc inf rat rat rat rat  │                                │
+│ rat inf inf inf inf            │                                │
+│ infizedizedizedizedized        │                                │
+│ inferinatinatinatinat guyco    │                                │
+│ rat ratry rat rat wor          │                                │
+│ ratretretretretret rat         │                                │
+│ ratretretret all all all all   │                                │
+│ all sc num num num num scosed  │                                │
+│ bro bro bro inf inf inf inf    │                                │
+│ inf inf inf                    │                                │
+│ scinatundundundundundundryica… │                                │
+│ inf scowsows mot               │                                │
+│ ratryretretretainretretretret… │                                │
+│ inf inf inf inf all all allere │                                │
+│ num num sc sc rat rat bro bro  │                                │
+│ bro bro bro rat bro bro wor    │                                │
+│ wor hu rat rat rat rat rat rat │                                │
+│ rat rat ratretret bro          │                                │
+│ broretretretretretretististis… │                                │
+│ ent heyttyttytty sc sc sc sc   │                                │
+│ scizedizedizedlessless sc sc   │                                │
+│ sc sc sc sc sc sc sc           │                                │
+│ scokretretretretpanycomannann… │                                │
+│ sc sc sc sc scoteoteoteintsote │                                │
+│ run run run run runone sc sc   │                                │
+│ sc                             │                                │
+│ scironironironironironcomcomc… │                                │
+│ sc sc bro bro bro me num num   │                                │
+│ num num sc                     │                                │
+│ sccomcomcomizedizedizedizediz… │                                │
+│ bro bro bro broretretretretret │                                │
+│ inf inf inf inf inf            │                                │
+│ numistowsowsowsardidade        │                                │
+│ runadecom                      │                                │
+│ ratcomcomcomgingingingingingin │                                │
+│ sc sc sc                       │                                │
+│ scicalicalicalicalicalosedose… │                                │
+│ infwical inf infret            │                                │
+│ ratannretretretretret sc sc    │                                │
+│ rat bro bro bro bro bro bro    │                                │
+│ inf inf inf rat rat rat rat    │                                │
+│ ratcomcom sc sc sc sc sc sc sc │                                │
+│ sc rat rat rat rat rat         │                                │
+│ infellellellellinat me all me  │                                │
+│ all scout num num              │                                │
+│ scazoboboboberererleslesicalo… │                                │
+│ sc scical sc scoutoutoutout    │                                │
+│ rat rat wor wor wor inf inf    │                                │
+│ inf inf infretretret sc        │                                │
+│ scardsardsardsardsardsital     │                                │
+│ infannannann sc sc sc sc sc sc │                                │
+│ sc sc sc sc wor worcomout      │                                │
+│ worizedizedizedizedgin bro bro │                                │
+│ bro bro bro                    │                                │
+│ enteeeeeputputputput bro bro   │                                │
+│ bro bro bro hu hu hu hu hu dam │                                │
+│ rat rat rat rat sc sc sc inf   │                                │
+│ infundicalicalicalicalundund   │                                │
+│ bro bro                        │                                │
+│ broicalicalicalicalical cer    │                                │
+│ cer cer cer                    │                                │
+│ certernternternterntern rat    │                                │
+│ ratretretretretretretretret    │                                │
+│ rat rat rat rat                │                                │
+│ ratannannizedizedized par par  │                                │
+│ par par par sci num num num    │                                │
+│ numeeeee num num num num numbr │                                │
+│ inf inf inf inf                │                                │
+│ ideundundundund scististist sc │                                │
+│ sc sc sc sc sc sc sc sc sc sc  │                                │
+│ woroneoneicalical              │                                │
+│ infcounchoryunch sc sc scone   │                                │
+│ sc sc sc sc sc sc              │                                │
+│ scoutoutoutout sc sc           │                                │
+│ scereereoneoneoneoneonecocoer… │                                │
+│ all all inf inf inf sc inf sc  │                                │
+│ sc sc sc sc sc sc              │                                │
+│ sclesleslesleslesularularular… │                                │
+│ sc sc sc sc                    │                                │
+│ numericalicalicalical bet bet  │                                │
+│ bet sc sc num num num run      │                                │
+│ runretretretretret bro         │                                │
+│ broretretretretretretretret    │                                │
+│ rat rat rat rat ratret cerret  │                                │
+│ cerretretretretretret inf bro  │                                │
+│ bro bro inf sc sc sc sc sc pay │                                │
+│ pay pay pay pay at at at at    │                                │
+│ infowsowsows scows             │                                │
+│ uhowsowsowsows bro bro bro bro │                                │
+│ bro rat rat rat ratbr wor wor  │                                │
+│ wor wor                        │                                │
+│ woroutoneoneoneoneideoideoide… │                                │
+│ sc scicalicaloneoneone sc his  │                                │
+│ his ac acideoideoideoideoideo  │                                │
+│ inf infretretret wom mor mor   │                                │
+│ morioney rat rat rat           │                                │
+│ ratereereizedizedizedundundun… │                                │
+│ wom wom wom                    │                                │
+│ womideoinatinatereereereereere │                                │
+│ hu his sc scere sc sconeoneone │                                │
+│ ide ide fl sc sc sc sc sc sc   │                                │
+│ sc ide sc sc sc sc sc sc sc sc │                                │
+│ sc sc sc sc sc sc sc           │                                │
+│ scicalicalicalicalicalical     │                                │
+│ scideoideoideoicalical sc sc   │                                │
+│ sc sc sc sc sc scere           │                                │
+│ scicalicalical                 │                                │
+│ acularularularularical sc sc   │                                │
+│ sc sc sc                       │                                │
+│ scicalicalicalularical sc      │                                │
+│ scical sc sc sc sc             │                                │
+│ sconeizedizedoneone            │                                │
+│ hisicalicalicalical sc sc sc   │                                │
+│ sc scical hisereereizedereinat │                                │
+│ sc sc his                      │                                │
+│ scundundundundereereereereere… │                                │
+│ ac ac ac ac                    │                                │
+│ acizedoneoneoneerericalicaler… │                                │
+│ sc scicalicalicalicalicalical  │                                │
+│ sc sc sc                       │                                │
+│ scoutoutoutoutouticalicalical  │                                │
+│ sc scicalicalicalicalical      │                                │
+│ infical inf sc sc sc sc inf    │                                │
+│ inf inf his hisone sc sc inf   │                                │
+│ inf sc sc inf sc sc            │                                │
+│ ideoneoneoneoneone sc sc       │                                │
+│ sconeoneoneoneoneoneoneoneone  │                                │
+│ scicalicalicalicalicaloneical  │                                │
+│ sconeoneicalical hu hu         │                                │
+│ huicalicalicaloneone sc sc sc  │                                │
+│ sc sc sc huical                │                                │
+│ huicalicalicalicalical sc sc   │                                │
+│ sc sc sc                       │                                │
+│ sconeoneoneoneoneicalicalical  │                                │
+│ hu huical sc scicalical sc     │                                │
+│ scicalicalicalicalicalical     │                                │
+│ scical hu hu hu huicalical sc  │                                │
+│ sc sc sc sc                    │                                │
+│ scicaloneicalicalical hu       │                                │
+│ huicalical hu hu hu hu hu hu   │                                │
+│ hu                             │                                │
+│ huicalicalicalicalizedizedica… │                                │
+│ hu scicalicalundizedicalical   │                                │
+│ scical huicalicalone sc        │                                │
+│ scicalizedizedizedizedizedize… │                                │
+│ sc sc sc hu scical             │                                │
+│ scicalicalicalicalicaloneoneo… │                                │
+│ sc scical scical hu hu hu hu   │                                │
+│ huicalicalicalicalicalicalone… │                                │
+│ sc scical scicalone sc sc      │                                │
+│ scicalicalicalicaloneone scone │                                │
+│ sc sc sc sc sc sc sc hu sc hu  │                                │
+│ scicalicalicalizedizedicalical │                                │
+│ scical                         │                                │
+│ scicalicalicalicalicaloneoneo… │                                │
+│ sc                             │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ scical sc sc sc sc sc sc sc sc │                                │
+│ sconeoneoneundundundularularu… │                                │
+│ hu hu huicalical hu hu hu hu   │                                │
+│ hu hu hu huicalical sc sc sc   │                                │
+│ scicalicalicalicaloneoneoneon… │                                │
+│ sc sc sc sc sc sc              │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc scone sc sc                 │                                │
+│ scicalicalicalizedizedizedize… │                                │
+│ sc sc hu scone sc scone sc sc  │                                │
+│ hu hu scicalicalical sc        │                                │
+│ scicalicaloneoneoneone sc sc   │                                │
+│ scone sc sc sc sc sc           │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc scical scicalicalone sc     │                                │
+│ scical                         │                                │
+│ scicalicalicaloneicalicalical  │                                │
+│ hu huicalicalical              │                                │
+│ scicalicaloneoneoneoneoneical… │                                │
+│ huicalical huicalical          │                                │
+│ huicalicalicalical scone sc sc │                                │
+│ sc sc scicalicalicalicalical   │                                │
+│ sc sc sc sc sc scical          │                                │
+│ scicalical sc sc               │                                │
+│ scicalicalicalicalicalicalica… │                                │
+│ sc scical sconeoneoneoneone sc │                                │
+│ sc hu scicaloneicaloneoneone   │                                │
+│ sc sc sc huone sc scone sc sc  │                                │
+│ hu hu scical hu hu hu hu hu hu │                                │
+│ hu sc sc sc scicalical sc sc   │                                │
+│ scical scical hu scical hu hu  │                                │
+│ hu huicalone sc sc sc sc sc sc │                                │
+│ sc scical hu hu hu sc sc hu hu │                                │
+│ hu hu scical hu scical scical  │                                │
+│ scical scicalicalicalone sc sc │                                │
+│ sc sc hu sc scical sc sc hu    │                                │
+│ huicaloneoneone sc sc sc sc sc │                                │
+│ sc hu scical hu scical scical  │                                │
+│ scical scical scical           │                                │
+│ scicaloneicalone sc sc hu hu   │                                │
+│ scicaloneone sc sc sc sc       │                                │
+│ scical sc sc sc sc sc sc       │                                │
+│ scical scical scicalone sc sc  │                                │
+│ sc sc scone scone sc sc sc hu  │                                │
+│ scicalone sc scone scicalical  │                                │
+│ scical scical scical scical hu │                                │
+│ scical hu scical hu scical     │                                │
+│ huical sc sc hu scical hu      │                                │
+│ scicaloneoneoneone sc scical   │                                │
+│ hu scicalone sc scone sc sc sc │                                │
+│ sc scicalical                  │                                │
+│ scicalicalicalicaloneicalone   │                                │
+│ sc sc sc hu hu sc scical       │                                │
+│ scical scicaloneicaloneone sc  │                                │
+│ scone sc scical scical         │                                │
+│ scicaloneoneoneoneone sc       │                                │
+│ scicalical scicalicaloneone    │                                │
+└────────────────────────────────┴────────────────────────────────┘
+/root/transducer/.venv/lib/python3.11/site-packages/numba/cuda/dispatcher.py:536: NumbaPerformanceWarning: Grid size 4 will likely result in GPU under-utilization due to low occupancy.
+  warn(NumbaPerformanceWarning(msg))
+/root/transducer/.venv/lib/python3.11/site-packages/numba/cuda/dispatcher.py:536: NumbaPerformanceWarning: Grid size 1 will likely result in GPU under-utilization due to low occupancy.
+  warn(NumbaPerformanceWarning(msg))
+[33msanity_val_loss[0m=[1;36m4341[0m[1;36m.6725[0m [33msanity_val_wer[0m=[1;36m72[0m[1;36m.8765[0m
+[2K/root/transducer/.venv/lib/python3.11/site-packages/numba/cuda/disp[33m0:00:03[0m [36m-:--:--[0m0m
+atcher.py:536: NumbaPerformanceWarning: Grid size 1 will likely
+result in GPU under-utilization due to low occupancy.
+  warn(NumbaPerformanceWarning(msg))
+[2K/root/transducer/.venv/lib/python3.11/site-packages/numba/cuda/disp[33m0:00:03[0m [36m-:--:--[0m
+atcher.py:536: NumbaPerformanceWarning: Grid size 4 will likely
+result in GPU under-utilization due to low occupancy.
+  warn(NumbaPerformanceWarning(msg))
+[2K[33mstep[0m=[1;36m10[0m [33mloss[0m=[1;36m3779[0m[1;36m.0044[0m:00:09[0m [36m8:27:10[0m
+[2K[33mstep[0m=[1;36m20[0m [33mloss[0m=[1;36m3167[0m[1;36m.0542[0m:00:15[0m [36m8:17:13[0m
+[2K[33mstep[0m=[1;36m30[0m [33mloss[0m=[1;36m2549[0m[1;36m.2083[0m:00:21[0m [36m8:20:43[0m
+[2K[33mstep[0m=[1;36m40[0m [33mloss[0m=[1;36m1794[0m[1;36m.8105[0m:00:27[0m [36m8:21:11[0m
+[2K[33mstep[0m=[1;36m50[0m [33mloss[0m=[1;36m839[0m[1;36m.1897[0m0:00:33[0m [36m8:19:48[0m
+[2K[33mstep[0m=[1;36m60[0m [33mloss[0m=[1;36m649[0m[1;36m.1356[0m0:00:39[0m [36m8:18:14[0m
+[2K[33mstep[0m=[1;36m70[0m [33mloss[0m=[1;36m881[0m[1;36m.9648[0m0:00:45[0m [36m8:20:15[0m
+[2K[33mstep[0m=[1;36m80[0m [33mloss[0m=[1;36m735[0m[1;36m.8616[0m0:00:51[0m [36m8:18:58[0m
+[2K[33mstep[0m=[1;36m90[0m [33mloss[0m=[1;36m612[0m[1;36m.9221[0m0:00:57[0m [36m8:20:04[0m
+[2K[33mstep[0m=[1;36m100[0m [33mloss[0m=[1;36m426[0m[1;36m.8214[0m:01:03[0m [36m8:19:31[0m
+[2K[33mstep[0m=[1;36m110[0m [33mloss[0m=[1;36m508[0m[1;36m.3357[0m:01:09[0m [36m8:26:20[0m
+[2K[33mstep[0m=[1;36m120[0m [33mloss[0m=[1;36m502[0m[1;36m.8742[0m:01:16[0m [36m8:28:05[0m
+[2K[33mstep[0m=[1;36m130[0m [33mloss[0m=[1;36m509[0m[1;36m.4873[0m:01:22[0m [36m8:29:29[0m
+[2K[33mstep[0m=[1;36m140[0m [33mloss[0m=[1;36m371[0m[1;36m.1500[0m:01:28[0m [36m8:31:50[0m
+[2K[33mstep[0m=[1;36m150[0m [33mloss[0m=[1;36m535[0m[1;36m.8105[0m0 [33m0:01:34[0m [36m8:37:15[0m
+[2K[33mstep[0m=[1;36m160[0m [33mloss[0m=[1;36m510[0m[1;36m.6615[0m0 [33m0:01:40[0m [36m8:32:30[0m
+[2K[33mstep[0m=[1;36m170[0m [33mloss[0m=[1;36m231[0m[1;36m.7920[0m0 [33m0:01:46[0m [36m8:33:23[0m
+[2K[33mstep[0m=[1;36m180[0m [33mloss[0m=[1;36m377[0m[1;36m.2903[0m0 [33m0:01:52[0m [36m8:31:37[0m
+[2KTraining [38;5;237m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m 187/50000 [33m0:01:57[0m [36m8:30:04[0m
