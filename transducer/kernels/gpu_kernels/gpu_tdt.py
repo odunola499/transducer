@@ -10,9 +10,10 @@ from transducer.kernels import utils
 from transducer.kernels.gpu_kernels import global_kernels as gpu_rnnt_kernel
 from transducer.kernels.gpu_kernels import helpers as rnnt_helper
 from transducer.kernels.gpu_kernels import reduce
+from transducer.kernels.gpu_kernels.gpu_rnnt import GPURNNT
 
 
-class GPUTDT:
+class GPUTDT(GPURNNT):
     def __init__(
         self,
         sigma: float,
@@ -30,7 +31,18 @@ class GPUTDT:
         num_threads: int,
         stream,
     ):
-        super().__init__()
+        super().__init__(
+            minibatch=minibatch,
+            maxT=maxT,
+            maxU=maxU,
+            alphabet_size=alphabet_size,
+            workspace=workspace,
+            blank=blank,
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+            num_threads=num_threads,
+            stream=stream,
+        )
 
         self.minibatch_ = minibatch
 
@@ -112,7 +124,6 @@ class GPUTDT:
 
         if training:
             label_grads *= 0.0  # zero grads
-
             duration_grads *= 0.0  # zero grads
 
         _, (denom, alphas, betas, llForward, llBackward, durations) = self._prepare_workspace()
@@ -122,7 +133,6 @@ class GPUTDT:
         self.log_softmax(label_acts, denom)
 
         r = random.uniform(0, 1)
-
         if r < self.omega:
             # Compute alphas
 
@@ -185,9 +195,7 @@ class GPUTDT:
                 # Compute gradient
 
                 grad_blocks_per_grid = self.minibatch_ * self.maxT_ * self.maxU_
-
                 grad_threads_per_block = gpu_rnnt_kernel.GPU_RNNT_THREAD_SIZE
-
                 gpu_rnnt_kernel.compute_grad_kernel[
                     grad_blocks_per_grid, grad_threads_per_block, self.stream_, 0
                 ](

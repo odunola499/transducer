@@ -1,6 +1,6 @@
 import torch
 
-from transducer.config import Wav2VecSmallConfig
+from transducer.models.config import Wav2VecSmallConfig
 from models.encoder import wav2vec
 
 

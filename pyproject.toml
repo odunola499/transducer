@@ -12,8 +12,19 @@ authors = [{ name = "Odunola" }]
 dependencies = [
   "transformers",
   "datasets",
-  "triton>=3.5.1",
+  "jiwer>=3.0.4",
   "numba>=0.63.1",
+  "pyyaml>=6.0.2",
+  "rich>=13.9.4",
+  "wandb>=0.16.0",
+  "torch>=2.9.1",
+  "pydantic>=2.12.5",
+  "sentencepiece>=0.2.1",
+  "torchcodec>=0.9.1",
+  "torchaudio>=2.9.1",
+  "kernels>=0.11.5",
+  "librosa>=0.11.0",
+  "pyyaml>=6.0.3",
 ]
 
 [project.optional-dependencies]

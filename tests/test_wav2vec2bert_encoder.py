@@ -1,6 +1,6 @@
 import torch
 
-from transducer.config import Wav2Vec2BertConfig
+from transducer.models.config import Wav2Vec2BertConfig
 from models.encoder import wav2vec2bert
 
 
