@@ -1,7 +1,7 @@
 
 from typing import Literal, Optional, Union
 from pydantic import StrictBool, StrictInt, StrictStr
-from transducer.config_base import Args
+from transducer.config import Args
 
 
 class TokenizerConfig(Args):
@@ -43,4 +43,3 @@ class DatasetConfig(Args):
     shuffle:StrictBool = True
     num_workers:StrictInt = 8
     pin_memory:StrictBool = True
-

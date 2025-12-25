@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr
-from transducer.config_base import Args
+from transducer.config import Args
 
 
 class EncoderConfig(Args):

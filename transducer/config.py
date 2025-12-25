@@ -1,15 +1,45 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any, Dict, TYPE_CHECKING
+
 import yaml
-from transducer.config_base import Args
-from transducer.dataset.config import DatasetConfig
-from transducer.models.config import ModelConfig
-from transducer.train.config import TrainConfig
+from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from transducer.dataset.config import DatasetConfig
+    from transducer.models.config import ModelConfig
+    from transducer.train.config import TrainConfig
+
+
+class Args(BaseModel):
+    extra_kwargs: Dict[str, Any] = {}
+
+    def to_dict(self):
+        return self.model_dump()
+
+    def to_json(self):
+        return self.model_dump_json()
+    
+def _ensure_forward_refs():
+    # Deferred imports to avoid circular dependency when downstream config modules import Args.
+    from transducer.dataset.config import DatasetConfig  # type: ignore
+    from transducer.models.config import ModelConfig  # type: ignore
+    from transducer.train.config import TrainConfig  # type: ignore
+
+    globals().update(
+        TrainConfig=TrainConfig,
+        ModelConfig=ModelConfig,
+        DatasetConfig=DatasetConfig,
+    )
+    Config.model_rebuild()
+    return TrainConfig, ModelConfig, DatasetConfig
 
 
 class Config(Args):
-    train: TrainConfig
-    model: ModelConfig
-    dataset: DatasetConfig
+    train: "TrainConfig"
+    model: "ModelConfig"
+    dataset: "DatasetConfig"
 
     def model_post_init(self, __context):
         if self.train.strategy == "fsdp":
@@ -20,6 +50,7 @@ class Config(Args):
 
     @classmethod
     def from_yaml(cls, content: str) -> "Config":
+        _ensure_forward_refs()
         data = yaml.safe_load(content)
         return cls.model_validate(data)
 

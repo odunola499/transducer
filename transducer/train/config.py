@@ -3,7 +3,7 @@ from typing import Optional, Literal, Union
 from datetime import datetime
 
 from pydantic import StrictBool, StrictInt, StrictStr, StrictFloat
-from transducer.config_base import Args
+from transducer.config import Args
 
 class TrainConfig(Args):
     per_device_train_batch_size: StrictInt = 8
