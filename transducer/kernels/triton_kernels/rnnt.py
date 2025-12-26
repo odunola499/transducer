@@ -9,6 +9,7 @@ import triton.language as tl
 
 NEG_INF = -1.0e30
 
+@triton.jit
 def _logsumexp_pair(a, b):
     m = tl.maximum(a, b)
     return m + tl.log(tl.exp(a - m) + tl.exp(b - m))
@@ -43,63 +44,62 @@ def _rnnt_alpha_kernel(
         t_t = tl.full((), t, tl.int32)
         for u in range(maxU):
             u_t = tl.full((), u, tl.int32)
-            if t == 0 and u == 0:
-                continue
-            in_range = (t_t < T) & (u_t < U)
-            if u == 0:
-                if t > 0:
+            if not (t == 0 and u == 0):
+                in_range = (t_t < T) & (u_t < U)
+                if u == 0:
+                    if t > 0:
+                        prev = tl.load(
+                            alpha_base + (t - 1) * maxU + 0, mask=in_range, other=neg_inf
+                        )
+                        logp = tl.load(
+                            logp_base + ((t - 1) * maxU + 0) * V + blank_id,
+                            mask=in_range,
+                            other=neg_inf,
+                        )
+                        tl.store(alpha_base + t * maxU + 0, prev + logp, mask=in_range)
+                elif t == 0:
+                    label_idx = tl.where(u_t > 0, u_t - 1, 0)
+                    label = tl.load(
+                        label_base + label_idx,
+                        mask=in_range & (u_t > 0) & (u_t - 1 < (U - 1)),
+                        other=0,
+                    )
+                    label = label.to(tl.int32)
                     prev = tl.load(
-                        alpha_base + (t - 1) * maxU + 0, mask=in_range, other=neg_inf
+                        alpha_base + 0 * maxU + (u - 1), mask=in_range, other=neg_inf
                     )
                     logp = tl.load(
-                        logp_base + ((t - 1) * maxU + 0) * V + blank_id,
+                        logp_base + (0 * maxU + (u - 1)) * V + label,
                         mask=in_range,
                         other=neg_inf,
                     )
-                    tl.store(alpha_base + t * maxU + 0, prev + logp, mask=in_range)
-            elif t == 0:
-                label_idx = tl.where(u_t > 0, u_t - 1, 0)
-                label = tl.load(
-                    label_base + label_idx,
-                    mask=in_range & (u_t > 0) & (u_t - 1 < (U - 1)),
-                    other=0,
-                )
-                label = label.to(tl.int32)
-                prev = tl.load(
-                    alpha_base + 0 * maxU + (u - 1), mask=in_range, other=neg_inf
-                )
-                logp = tl.load(
-                    logp_base + (0 * maxU + (u - 1)) * V + label,
-                    mask=in_range,
-                    other=neg_inf,
-                )
-                tl.store(alpha_base + 0 * maxU + u, prev + logp, mask=in_range)
-            else:
-                no_emit = tl.load(
-                    alpha_base + (t - 1) * maxU + u, mask=in_range, other=neg_inf
-                )
-                no_emit = no_emit + tl.load(
-                    logp_base + ((t - 1) * maxU + u) * V + blank_id,
-                    mask=in_range,
-                    other=neg_inf,
-                )
-                label_idx = tl.where(u_t > 0, u_t - 1, 0)
-                label = tl.load(
-                    label_base + label_idx,
-                    mask=in_range & (u_t > 0) & (u_t - 1 < (U - 1)),
-                    other=0,
-                )
-                label = label.to(tl.int32)
-                emit = tl.load(
-                    alpha_base + t * maxU + (u - 1), mask=in_range, other=neg_inf
-                )
-                emit = emit + tl.load(
-                    logp_base + (t * maxU + (u - 1)) * V + label,
-                    mask=in_range,
-                    other=neg_inf,
-                )
-                out = _logsumexp_pair(emit, no_emit)
-                tl.store(alpha_base + t * maxU + u, out, mask=in_range)
+                    tl.store(alpha_base + 0 * maxU + u, prev + logp, mask=in_range)
+                else:
+                    no_emit = tl.load(
+                        alpha_base + (t - 1) * maxU + u, mask=in_range, other=neg_inf
+                    )
+                    no_emit = no_emit + tl.load(
+                        logp_base + ((t - 1) * maxU + u) * V + blank_id,
+                        mask=in_range,
+                        other=neg_inf,
+                    )
+                    label_idx = tl.where(u_t > 0, u_t - 1, 0)
+                    label = tl.load(
+                        label_base + label_idx,
+                        mask=in_range & (u_t > 0) & (u_t - 1 < (U - 1)),
+                        other=0,
+                    )
+                    label = label.to(tl.int32)
+                    emit = tl.load(
+                        alpha_base + t * maxU + (u - 1), mask=in_range, other=neg_inf
+                    )
+                    emit = emit + tl.load(
+                        logp_base + (t * maxU + (u - 1)) * V + label,
+                        mask=in_range,
+                        other=neg_inf,
+                    )
+                    out = _logsumexp_pair(emit, no_emit)
+                    tl.store(alpha_base + t * maxU + u, out, mask=in_range)
 
     t_last = T - 1
     u_last = U - 1
