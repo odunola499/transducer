@@ -100,7 +100,7 @@ class DecoderConfig(Args):
 
 class ModelConfig(Args):
     model_name:StrictStr # Used for logging etc
-    loss_type:Literal['tdt','rnnt'] = 'rnnt'
+    loss_type:Literal['tdt','rnnt','rnnt_triton'] = 'rnnt'
     loss_duration:Optional[list[StrictInt]] = None
     fastemit_lambda: StrictFloat = 0.0
     # If None, blank_id will be set to decoder_config.vocab_size (i.e., after tokens).

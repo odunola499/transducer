@@ -25,6 +25,7 @@ dependencies = [
   "kernels>=0.11.5",
   "librosa>=0.11.0",
   "pyyaml>=6.0.3",
+  "triton"
 ]
 
 [project.optional-dependencies]
