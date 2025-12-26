@@ -9,10 +9,6 @@ from transducer.losses.rnnt.rnnt_triton import RNNTTritonLoss
 def _check_env():
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for this benchmark.")
-    try:
-        import triton  # noqa: F401
-    except Exception as exc:
-        raise RuntimeError("Triton is required for this benchmark.") from exc
 
 
 def _make_data(batch, max_t, max_u, vocab):
@@ -24,9 +20,96 @@ def _make_data(batch, max_t, max_u, vocab):
     return acts, labels, act_lens, label_lens
 
 
-def _compare_case(batch, max_t, max_u, vocab, fastemit_lambda=0.0, clamp=0.0):
-    acts, labels, act_lens, label_lens = _make_data(batch, max_t, max_u, vocab)
+def _make_training_like_data(
+    batch,
+    max_t,
+    max_u,
+    vocab,
+    pad_id=0,
+    max_label_len=None,
+    force_max_label=True,
+    allow_zero_tokens=False,
+):
+    device = torch.device("cuda")
     blank_id = vocab - 1
+    max_label_len = max_u if max_label_len is None else max_label_len
+    label_lens = torch.randint(1, max_label_len + 1, (batch,), device=device, dtype=torch.long)
+    if force_max_label:
+        label_lens[0] = max_label_len
+
+    labels = torch.full((batch, max_u), pad_id, device=device, dtype=torch.long)
+    low_token = 0 if allow_zero_tokens else 1
+    for i, length in enumerate(label_lens.tolist()):
+        labels[i, :length] = torch.randint(
+            low_token, blank_id, (length,), device=device, dtype=torch.long
+        )
+
+    label_lens = (labels != pad_id).sum(dim=-1)
+    acts = torch.randn(batch, max_t, max_u, vocab, device=device, dtype=torch.float32)
+    return acts, labels, None, label_lens
+
+
+def _tensor_stats(tensor):
+    finite = torch.isfinite(tensor)
+    finite_ratio = finite.float().mean().item()
+    if finite.any().item():
+        finite_vals = tensor[finite]
+        return {
+            "min": finite_vals.min().item(),
+            "max": finite_vals.max().item(),
+            "mean": finite_vals.mean().item(),
+            "absmax": finite_vals.abs().max().item(),
+            "finite_ratio": finite_ratio,
+        }
+    return {
+        "min": float("nan"),
+        "max": float("nan"),
+        "mean": float("nan"),
+        "absmax": float("nan"),
+        "finite_ratio": finite_ratio,
+    }
+
+
+def _print_nonfinite_debug(tag, acts, labels, act_lens, label_lens, blank_id):
+    batch, max_t, max_u, vocab = acts.shape
+    act_lens_use = (
+        torch.full((batch,), max_t, device=acts.device, dtype=torch.long)
+        if act_lens is None
+        else act_lens
+    )
+    print(f"{tag} debug:")
+    print(
+        f"  shapes: acts={tuple(acts.shape)} labels={tuple(labels.shape)} "
+        f"act_lens={tuple(act_lens_use.shape)} label_lens={tuple(label_lens.shape)}"
+    )
+    print(
+        f"  lengths: act_lens=[{act_lens_use.min().item()},{act_lens_use.max().item()}] "
+        f"label_lens=[{label_lens.min().item()},{label_lens.max().item()}]"
+    )
+    print(
+        f"  label_range: min={labels.min().item()} max={labels.max().item()} "
+        f"zeros={(labels == 0).sum().item()} blank_id={blank_id}"
+    )
+    print(
+        f"  len_violations: label_lens>=U={(label_lens >= max_u).sum().item()} "
+        f"act_lens>T={(act_lens_use > max_t).sum().item()}"
+    )
+    stats = _tensor_stats(acts)
+    print(
+        "  logits: "
+        f"min={stats['min']:.3f} max={stats['max']:.3f} mean={stats['mean']:.3f} "
+        f"absmax={stats['absmax']:.3f} finite_ratio={stats['finite_ratio']:.3f}"
+    )
+    log_probs = torch.log_softmax(acts, dim=-1)
+    lp_stats = _tensor_stats(log_probs)
+    print(
+        "  log_softmax: "
+        f"min={lp_stats['min']:.3f} max={lp_stats['max']:.3f} mean={lp_stats['mean']:.3f} "
+        f"absmax={lp_stats['absmax']:.3f} finite_ratio={lp_stats['finite_ratio']:.3f}"
+    )
+
+
+def _compare_data(acts, labels, act_lens, label_lens, blank_id, fastemit_lambda=0.0, clamp=0.0):
 
     loss_cuda = RNNTLoss(
         blank_id=blank_id,
@@ -57,7 +140,58 @@ def _compare_case(batch, max_t, max_u, vocab, fastemit_lambda=0.0, clamp=0.0):
     torch.cuda.synchronize()
     loss_diff = (loss_val_cuda - loss_val_triton).abs().item()
     grad_diff = (acts_cuda.grad - acts_triton.grad).abs().max().item()
-    return loss_diff, grad_diff
+    cuda_loss_finite = torch.isfinite(loss_val_cuda).all().item()
+    triton_loss_finite = torch.isfinite(loss_val_triton).all().item()
+    cuda_grad_finite = torch.isfinite(acts_cuda.grad).all().item()
+    triton_grad_finite = torch.isfinite(acts_triton.grad).all().item()
+    if not (cuda_loss_finite and triton_loss_finite and cuda_grad_finite and triton_grad_finite):
+        _print_nonfinite_debug(
+            "non_finite", acts, labels, act_lens, label_lens, blank_id
+        )
+    return (
+        loss_diff,
+        grad_diff,
+        cuda_loss_finite,
+        triton_loss_finite,
+        cuda_grad_finite,
+        triton_grad_finite,
+    )
+
+
+def _compare_case(batch, max_t, max_u, vocab, fastemit_lambda=0.0, clamp=0.0):
+    acts, labels, act_lens, label_lens = _make_data(batch, max_t, max_u, vocab)
+    blank_id = vocab - 1
+    return _compare_data(
+        acts,
+        labels,
+        act_lens,
+        label_lens,
+        blank_id,
+        fastemit_lambda=fastemit_lambda,
+        clamp=clamp,
+    )
+
+
+def _warmup(loss_fn, acts, labels, act_lens, label_lens, iters=5):
+    for _ in range(iters):
+        logits = acts.clone().requires_grad_(True)
+        loss = loss_fn(logits, labels, act_lens=act_lens, label_lens=label_lens)
+        loss.backward()
+    torch.cuda.synchronize()
+
+
+def _measure_memory(loss_fn, acts, labels, act_lens, label_lens):
+    device = acts.device
+    torch.cuda.synchronize(device)
+    torch.cuda.reset_peak_memory_stats(device)
+    logits = acts.clone().requires_grad_(True)
+    loss = loss_fn(logits, labels, act_lens=act_lens, label_lens=label_lens)
+    loss.backward()
+    torch.cuda.synchronize(device)
+    return (
+        torch.cuda.max_memory_allocated(device),
+        torch.cuda.max_memory_reserved(device),
+    )
 
 
 def _benchmark(loss_fn, acts, labels, act_lens, label_lens, iters=20):
@@ -72,30 +206,132 @@ def _benchmark(loss_fn, acts, labels, act_lens, label_lens, iters=20):
     return (elapsed / iters) * 1000.0
 
 
+def _format_mem(value_bytes):
+    return f"{value_bytes / (1024 ** 2):.1f}MiB"
+
+
 def main():
     _check_env()
     torch.manual_seed(0)
 
-    cases = [
+    random_cases = [
         (2, 32, 16, 64),
         (2, 64, 32, 128),
         (4, 64, 32, 256),
+        (8, 64, 32, 1025),
+        (8, 750, 102, 1025),
+    ]
+    train_like_cases = [
+        ("train_like", 4, 400, 128, 1025, True, None, False),
+        ("train_like_safe", 4, 400, 128, 1025, False, 127, False),
+        ("train_like_unk", 4, 400, 128, 1025, False, 127, True),
+        ("train_like_maxU_unk", 4, 400, 128, 1025, True, None, True),
+    ]
+    scaled_cases = [
+        ("scaled_5x", 2, 200, 64, 1025, 5.0),
+        ("scaled_20x", 2, 200, 64, 1025, 20.0),
+        ("scaled_80x", 1, 200, 64, 1025, 80.0),
     ]
     fastemit_lambda = 0.1
     clamp = 0.0
+    warmup_iters = 5
+    timed_iters = 20
 
-    print("RNNT Triton vs CUDA correctness")
-    for batch, max_t, max_u, vocab in cases:
-        loss_diff, grad_diff = _compare_case(
+    print("RNNT Triton vs CUDA correctness (random lengths)")
+    for batch, max_t, max_u, vocab in random_cases:
+        (
+            loss_diff,
+            grad_diff,
+            cuda_loss_finite,
+            triton_loss_finite,
+            cuda_grad_finite,
+            triton_grad_finite,
+        ) = _compare_case(
             batch, max_t, max_u, vocab, fastemit_lambda=fastemit_lambda, clamp=clamp
         )
         print(
             f"case B={batch} T={max_t} U={max_u} V={vocab} "
-            f"loss_diff={loss_diff:.6f} grad_max_diff={grad_diff:.6f}"
+            f"loss_diff={loss_diff:.6f} grad_max_diff={grad_diff:.6f} "
+            f"cuda_finite={cuda_loss_finite and cuda_grad_finite} "
+            f"triton_finite={triton_loss_finite and triton_grad_finite}"
+        )
+
+    print("\nRNNT Triton vs CUDA correctness (train-like padding)")
+    for name, batch, max_t, max_u, vocab, force_max_label, max_label_len, allow_zero_tokens in train_like_cases:
+        acts, labels, act_lens, label_lens = _make_training_like_data(
+            batch,
+            max_t,
+            max_u,
+            vocab,
+            pad_id=0,
+            max_label_len=max_label_len,
+            force_max_label=force_max_label,
+            allow_zero_tokens=allow_zero_tokens,
+        )
+        blank_id = vocab - 1
+        (
+            loss_diff,
+            grad_diff,
+            cuda_loss_finite,
+            triton_loss_finite,
+            cuda_grad_finite,
+            triton_grad_finite,
+        ) = _compare_data(
+            acts,
+            labels,
+            act_lens,
+            label_lens,
+            blank_id,
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+        )
+        print(
+            f"case {name} B={batch} T={max_t} U={max_u} V={vocab} "
+            f"label_lens=[{label_lens.min().item()},{label_lens.max().item()}] "
+            f"loss_diff={loss_diff:.6f} grad_max_diff={grad_diff:.6f} "
+            f"cuda_finite={cuda_loss_finite and cuda_grad_finite} "
+            f"triton_finite={triton_loss_finite and triton_grad_finite}"
+        )
+
+    print("\nRNNT Triton vs CUDA correctness (scaled logits)")
+    for name, batch, max_t, max_u, vocab, scale in scaled_cases:
+        acts, labels, act_lens, label_lens = _make_training_like_data(
+            batch,
+            max_t,
+            max_u,
+            vocab,
+            pad_id=0,
+            max_label_len=max_u - 1,
+            force_max_label=False,
+            allow_zero_tokens=False,
+        )
+        acts = acts * scale
+        blank_id = vocab - 1
+        (
+            loss_diff,
+            grad_diff,
+            cuda_loss_finite,
+            triton_loss_finite,
+            cuda_grad_finite,
+            triton_grad_finite,
+        ) = _compare_data(
+            acts,
+            labels,
+            act_lens,
+            label_lens,
+            blank_id,
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+        )
+        print(
+            f"case {name} B={batch} T={max_t} U={max_u} V={vocab} "
+            f"scale={scale:.1f} loss_diff={loss_diff:.6f} grad_max_diff={grad_diff:.6f} "
+            f"cuda_finite={cuda_loss_finite and cuda_grad_finite} "
+            f"triton_finite={triton_loss_finite and triton_grad_finite}"
         )
 
     print("\nRNNT Triton vs CUDA speed (ms, forward+backward)")
-    for batch, max_t, max_u, vocab in cases:
+    for batch, max_t, max_u, vocab in random_cases:
         acts, labels, act_lens, label_lens = _make_data(batch, max_t, max_u, vocab)
         blank_id = vocab - 1
         loss_cuda = RNNTLoss(
@@ -110,11 +346,67 @@ def main():
             fastemit_lambda=fastemit_lambda,
             clamp=clamp,
         )
-        cuda_ms = _benchmark(loss_cuda, acts, labels, act_lens, label_lens)
-        triton_ms = _benchmark(loss_triton, acts, labels, act_lens, label_lens)
+        _warmup(loss_cuda, acts, labels, act_lens, label_lens, iters=warmup_iters)
+        _warmup(loss_triton, acts, labels, act_lens, label_lens, iters=warmup_iters)
+        cuda_mem = _measure_memory(loss_cuda, acts, labels, act_lens, label_lens)
+        triton_mem = _measure_memory(loss_triton, acts, labels, act_lens, label_lens)
+        cuda_ms = _benchmark(loss_cuda, acts, labels, act_lens, label_lens, iters=timed_iters)
+        triton_ms = _benchmark(
+            loss_triton, acts, labels, act_lens, label_lens, iters=timed_iters
+        )
         print(
             f"case B={batch} T={max_t} U={max_u} V={vocab} "
-            f"cuda={cuda_ms:.2f}ms triton={triton_ms:.2f}ms"
+            f"cuda={cuda_ms:.2f}ms triton={triton_ms:.2f}ms",
+        )
+        print(
+            f"  cuda_peak_alloc={_format_mem(cuda_mem[0])} "
+            f"cuda_peak_reserved={_format_mem(cuda_mem[1])} "
+            f"triton_peak_alloc={_format_mem(triton_mem[0])} "
+            f"triton_peak_reserved={_format_mem(triton_mem[1])}"
+        )
+
+    print("\nRNNT Triton vs CUDA speed (train-like padding)")
+    for name, batch, max_t, max_u, vocab, force_max_label, max_label_len, allow_zero_tokens in train_like_cases:
+        acts, labels, act_lens, label_lens = _make_training_like_data(
+            batch,
+            max_t,
+            max_u,
+            vocab,
+            pad_id=0,
+            max_label_len=max_label_len,
+            force_max_label=force_max_label,
+            allow_zero_tokens=allow_zero_tokens,
+        )
+        blank_id = vocab - 1
+        loss_cuda = RNNTLoss(
+            blank_id=blank_id,
+            reduction="mean",
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+        )
+        loss_triton = RNNTTritonLoss(
+            blank_id=blank_id,
+            reduction="mean",
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+        )
+        _warmup(loss_cuda, acts, labels, act_lens, label_lens, iters=warmup_iters)
+        _warmup(loss_triton, acts, labels, act_lens, label_lens, iters=warmup_iters)
+        cuda_mem = _measure_memory(loss_cuda, acts, labels, act_lens, label_lens)
+        triton_mem = _measure_memory(loss_triton, acts, labels, act_lens, label_lens)
+        cuda_ms = _benchmark(loss_cuda, acts, labels, act_lens, label_lens, iters=timed_iters)
+        triton_ms = _benchmark(
+            loss_triton, acts, labels, act_lens, label_lens, iters=timed_iters
+        )
+        print(
+            f"case {name} B={batch} T={max_t} U={max_u} V={vocab} "
+            f"cuda={cuda_ms:.2f}ms triton={triton_ms:.2f}ms",
+        )
+        print(
+            f"  cuda_peak_alloc={_format_mem(cuda_mem[0])} "
+            f"cuda_peak_reserved={_format_mem(cuda_mem[1])} "
+            f"triton_peak_alloc={_format_mem(triton_mem[0])} "
+            f"triton_peak_reserved={_format_mem(triton_mem[1])}"
         )
 
 

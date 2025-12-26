@@ -214,8 +214,8 @@ def _rnnt_grad_kernel(
     clamp: tl.constexpr,
     BLOCK_V: tl.constexpr,
 ):
-    pid_b = tl.program_id(0)
-    pid_tu = tl.program_id(1)
+    pid_tu = tl.program_id(0)
+    pid_b = tl.program_id(1)
     pid_v = tl.program_id(2)
 
     t = pid_tu // maxU
@@ -393,7 +393,8 @@ def _launch_grads(
 ) -> torch.Tensor:
     B, maxT, maxU, V = log_probs.shape
     grads = torch.zeros_like(log_probs)
-    grid = (B, maxT * maxU, triton.cdiv(V, block_v))
+    # Put the largest dimension on grid.x to avoid the 65k grid.y limit.
+    grid = (maxT * maxU, B, triton.cdiv(V, block_v))
     label_stride = labels.shape[1]
     _rnnt_grad_kernel[grid](
         log_probs,

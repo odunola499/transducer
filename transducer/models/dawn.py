@@ -82,6 +82,8 @@ class DawnModel(BaseModel, GenerationMixin):
 
     def compute_loss(self, lattice:Tensor, labels:Tensor, act_lens:Tensor, label_lens:Tensor):
         lattice = lattice.float()
+        if self.config.loss_type in {"rnnt", "rnnt_triton"}:
+            self._assert_rnnt_inputs(lattice, labels, act_lens, label_lens)
         with torch.autocast(device_type=lattice.device.type, enabled=False):
             return self.loss_func(
                 acts=lattice,
@@ -89,3 +91,66 @@ class DawnModel(BaseModel, GenerationMixin):
                 label_lens=label_lens,
                 act_lens=act_lens,
             )
+
+    def _assert_rnnt_inputs(
+        self,
+        lattice: Tensor,
+        labels: Tensor,
+        act_lens: Optional[Tensor],
+        label_lens: Tensor,
+    ) -> None:
+        if lattice.dim() != 4:
+            raise RuntimeError(f"RNNT logits must be 4D, got shape {tuple(lattice.shape)}")
+        if not torch.isfinite(lattice).all().item():
+            raise RuntimeError("RNNT logits contain NaN/Inf values.")
+
+        batch, max_t, max_u, vocab = lattice.shape
+        if vocab != self.vocab_size_with_blank:
+            raise RuntimeError(
+                "RNNT logits last dim must match vocab_size_with_blank "
+                f"({vocab} != {self.vocab_size_with_blank})."
+            )
+        if labels.dim() != 2 or labels.shape[0] != batch:
+            raise RuntimeError(
+                f"RNNT labels must be [B, U], got shape {tuple(labels.shape)}"
+            )
+        if labels.device != lattice.device:
+            raise RuntimeError("RNNT labels must be on the same device as logits.")
+        if label_lens is None:
+            raise RuntimeError("label_lens is required for RNNT loss.")
+        if label_lens.dim() != 1 or label_lens.shape[0] != batch:
+            raise RuntimeError(
+                f"label_lens must be shape [B], got shape {tuple(label_lens.shape)}"
+            )
+        if label_lens.device != lattice.device:
+            raise RuntimeError("label_lens must be on the same device as logits.")
+
+        def _assert_no(condition: Tensor, message: str) -> None:
+            if condition.any().item():
+                raise RuntimeError(message)
+
+        _assert_no(labels < 0, "RNNT labels must be >= 0.")
+        _assert_no(
+            labels >= self.blank_id,
+            f"RNNT labels must be < blank_id ({self.blank_id}).",
+        )
+        _assert_no(label_lens < 0, "label_lens must be >= 0.")
+        _assert_no(label_lens >= max_u, "label_lens must be <= U-1.")
+        _assert_no(
+            label_lens > labels.shape[1],
+            "label_lens exceeds labels sequence length.",
+        )
+
+        if act_lens is None:
+            act_lens = torch.full(
+                (batch,), max_t, device=lattice.device, dtype=torch.long
+            )
+        elif act_lens.device != lattice.device:
+            raise RuntimeError("act_lens must be on the same device as logits.")
+        elif act_lens.dim() != 1 or act_lens.shape[0] != batch:
+            raise RuntimeError(
+                f"act_lens must be shape [B], got shape {tuple(act_lens.shape)}"
+            )
+
+        _assert_no(act_lens <= 0, "act_lens must be >= 1.")
+        _assert_no(act_lens > max_t, "act_lens must be <= T.")
