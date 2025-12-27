@@ -31,8 +31,8 @@ train:
 
 model:
   model_name: dawn
-  loss_type: rnnt_triton
-  loss_duration: null
+  loss_type: tdt_triton
+  loss_duration: [0,1,2,3,4]
   fastemit_lambda: 0.0
   blank_id: 1024
   loss_reduction: mean
