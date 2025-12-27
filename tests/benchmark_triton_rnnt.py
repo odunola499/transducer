@@ -172,6 +172,92 @@ def _compare_case(batch, max_t, max_u, vocab, fastemit_lambda=0.0, clamp=0.0):
     )
 
 
+def _compute_grads(loss_fn, acts, labels, act_lens, label_lens):
+    logits = acts.clone().requires_grad_(True)
+    loss = loss_fn(logits, labels, act_lens=act_lens, label_lens=label_lens)
+    loss.backward()
+    return loss.detach(), logits.grad.detach()
+
+
+def _autograd_parity(acts, labels, act_lens, label_lens, loss_ref, loss_new):
+    loss_ref_val, grads_ref = _compute_grads(
+        loss_ref, acts, labels, act_lens, label_lens
+    )
+    loss_new_val, grads_new = _compute_grads(
+        loss_new, acts, labels, act_lens, label_lens
+    )
+
+    diff = (grads_ref - grads_new).abs()
+    max_abs = diff.max().item()
+    denom = torch.maximum(grads_ref.abs(), grads_new.abs())
+    max_rel = (diff / (denom + 1e-6)).max().item()
+    nonfinite_ref = (~torch.isfinite(grads_ref)).any().item()
+    nonfinite_new = (~torch.isfinite(grads_new)).any().item()
+    return {
+        "loss_ref": loss_ref_val.item(),
+        "loss_new": loss_new_val.item(),
+        "max_abs": max_abs,
+        "max_rel": max_rel,
+        "nonfinite_ref": nonfinite_ref,
+        "nonfinite_new": nonfinite_new,
+        "grads_ref": grads_ref,
+        "grads_new": grads_new,
+    }
+
+
+def _finite_diff_check(loss_fn, acts, labels, act_lens, label_lens, grads, num_checks=5, eps=1e-3):
+    bsz, t_sz, u_sz, v_sz = acts.shape
+    max_abs = 0.0
+    max_rel = 0.0
+    sign_mismatch = 0
+    nonfinite = 0
+
+    for _ in range(num_checks):
+        b = torch.randint(0, bsz, (1,)).item()
+        t = torch.randint(0, t_sz, (1,)).item()
+        u = torch.randint(0, u_sz, (1,)).item()
+        v = torch.randint(0, v_sz, (1,)).item()
+
+        acts_plus = acts.clone()
+        acts_minus = acts.clone()
+        acts_plus[b, t, u, v] += eps
+        acts_minus[b, t, u, v] -= eps
+
+        with torch.no_grad():
+            loss_plus = loss_fn(
+                acts_plus, labels, act_lens=act_lens, label_lens=label_lens
+            ).item()
+            loss_minus = loss_fn(
+                acts_minus, labels, act_lens=act_lens, label_lens=label_lens
+            ).item()
+
+        num_grad = (loss_plus - loss_minus) / (2.0 * eps)
+        auto_grad = grads[b, t, u, v].item()
+
+        if not (torch.isfinite(torch.tensor(num_grad)) and torch.isfinite(torch.tensor(auto_grad))):
+            nonfinite += 1
+            continue
+
+        abs_err = abs(num_grad - auto_grad)
+        rel_err = abs_err / (abs(auto_grad) + 1e-6)
+        max_abs = max(max_abs, abs_err)
+        max_rel = max(max_rel, rel_err)
+
+        if num_grad == 0.0 or auto_grad == 0.0:
+            continue
+        if (num_grad > 0) != (auto_grad > 0):
+            sign_mismatch += 1
+
+    return max_abs, max_rel, sign_mismatch, nonfinite
+
+
+def _grad_stats(grads):
+    bsz = grads.shape[0]
+    flat = grads.view(bsz, -1)
+    norms = flat.norm(dim=1)
+    return norms.mean().item(), norms.var(unbiased=False).item()
+
+
 def _warmup(loss_fn, acts, labels, act_lens, label_lens, iters=5):
     for _ in range(iters):
         logits = acts.clone().requires_grad_(True)
@@ -254,6 +340,67 @@ def main():
             f"loss_diff={loss_diff:.6f} grad_max_diff={grad_diff:.6f} "
             f"cuda_finite={cuda_loss_finite and cuda_grad_finite} "
             f"triton_finite={triton_loss_finite and triton_grad_finite}"
+        )
+
+    print("\nRNNT Triton gradient correctness (autograd parity + finite diff)")
+    for batch, max_t, max_u, vocab in random_cases[:3]:
+        acts, labels, act_lens, label_lens = _make_data(batch, max_t, max_u, vocab)
+        blank_id = vocab - 1
+        loss_ref = RNNTLoss(
+            blank_id=blank_id,
+            reduction="mean",
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+        )
+        loss_new = RNNTTritonLoss(
+            blank_id=blank_id,
+            reduction="mean",
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+        )
+        parity = _autograd_parity(acts, labels, act_lens, label_lens, loss_ref, loss_new)
+        fd_abs, fd_rel, fd_sign, fd_nonfinite = _finite_diff_check(
+            loss_new,
+            acts,
+            labels,
+            act_lens,
+            label_lens,
+            parity["grads_new"],
+            num_checks=5,
+            eps=1e-3,
+        )
+        print(
+            f"case B={batch} T={max_t} U={max_u} V={vocab} "
+            f"max_abs={parity['max_abs']:.6f} max_rel={parity['max_rel']:.6f} "
+            f"nonfinite_ref={parity['nonfinite_ref']} nonfinite_new={parity['nonfinite_new']}"
+        )
+        print(
+            f"  finite_diff: max_abs={fd_abs:.6f} max_rel={fd_rel:.6f} "
+            f"sign_mismatch={fd_sign} nonfinite={fd_nonfinite}"
+        )
+        mean_norm, var_norm = _grad_stats(parity["grads_new"])
+        print(f"  grad_scale: mean_norm={mean_norm:.6f} var_norm={var_norm:.6f}")
+
+    print("\nRNNT Triton gradient scale sanity (increasing length)")
+    length_cases = [
+        (1, 32, 16, 64),
+        (1, 64, 32, 128),
+        (1, 128, 64, 256),
+        (4, 750, 150, 1025)
+    ]
+    for batch, max_t, max_u, vocab in length_cases:
+        acts, labels, act_lens, label_lens = _make_data(batch, max_t, max_u, vocab)
+        loss_triton = RNNTTritonLoss(
+            blank_id=vocab - 1,
+            reduction="mean",
+            fastemit_lambda=fastemit_lambda,
+            clamp=clamp,
+        )
+        _, grads_new = _compute_grads(loss_triton, acts, labels, act_lens, label_lens)
+        mean_norm, var_norm = _grad_stats(grads_new)
+        print(
+            f"case B={batch} T={max_t} U={max_u} V={vocab} "
+            f"mean_norm={mean_norm:.6f} var_norm={var_norm:.6f}"
         )
 
     print("\nRNNT Triton vs CUDA correctness (train-like padding)")
