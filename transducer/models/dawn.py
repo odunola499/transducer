@@ -5,7 +5,8 @@ from typing import Optional
 from transducer.models.base import BaseModel
 from transducer.models.config import ModelConfig, Wav2Vec2BertConfig, Wav2VecConfig
 from transducer.losses import LOSSES
-from transducer.models.decoder.rnnt import SimpleJoiner, RNNPredictor
+from transducer.models.decoder.joiner import SimpleJoiner
+from transducer.models.decoder.predictor import RNNPredictor
 from transducer.models.encoder.wav2vec import Wav2VecModel
 from transducer.models.encoder.wav2vec2bert import Wav2Vec2BertModel
 from transducer.samplers import GenerationMixin
@@ -24,13 +25,16 @@ class DawnModel(BaseModel, GenerationMixin):
         self.vocab_size_with_blank = base_vocab_size + 1
 
         LOSS = LOSSES[config.loss_type]
-        if config.loss_type == 'tdt':
+        if config.loss_type in {"tdt", "tdt_triton"}:
             assert config.loss_duration is not None, "Duration is required for tdt loss"
-        self.loss_func = LOSS(
-            blank_id = self.blank_id,
-            reduction=config.loss_reduction,
-            fastemit_lambda=config.fastemit_lambda,
-        )
+        loss_kwargs = {
+            "blank_id": self.blank_id,
+            "reduction": config.loss_reduction,
+            "fastemit_lambda": config.fastemit_lambda,
+        }
+        if config.loss_type in {"tdt", "tdt_triton"}:
+            loss_kwargs["durations"] = config.loss_duration
+        self.loss_func = LOSS(**loss_kwargs)
 
         encoder_config = config.encoder_config
         decoder_config = config.decoder_config

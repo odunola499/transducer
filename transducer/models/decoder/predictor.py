@@ -3,7 +3,7 @@ from typing import Optional
 import torch
 from torch import Tensor, nn
 
-from transducer.commons import Joiner, Predictor
+from transducer.commons import Predictor
 from transducer.models.config import DecoderConfig
 
 
@@ -13,8 +13,7 @@ class RNNPredictor(Predictor):
         effective_vocab_size = vocab_size if vocab_size is not None else config.vocab_size
         self.text_embed = nn.Embedding(effective_vocab_size, config.embed_dim)
         self.rnn_type = config.rnn_type
-        if 'gru' in config.rnn_type:
-
+        if "gru" in config.rnn_type:
             self.rnn = nn.GRU(
                 input_size=config.embed_dim,
                 hidden_size=config.hidden_dim,
@@ -22,7 +21,7 @@ class RNNPredictor(Predictor):
                 batch_first=True,
                 dropout=0.0,
             )
-        elif 'lstm' in config.rnn_type:
+        elif "lstm" in config.rnn_type:
             self.rnn = nn.LSTM(
                 input_size=config.embed_dim,
                 hidden_size=config.hidden_dim,
@@ -50,39 +49,10 @@ class RNNPredictor(Predictor):
         output = self.proj(output.squeeze(1))
         return output, new_state
 
-    def init_state(self, batch_size:int = 1):
+    def init_state(self, batch_size: int = 1):
         hidden_size = self.rnn.hidden_size
         if "lstm" in self.rnn_type:
             h0 = torch.zeros(self.config.num_layers, batch_size, hidden_size)
             c0 = torch.zeros(self.config.num_layers, batch_size, hidden_size)
             return (h0, c0)
         return torch.zeros(self.config.num_layers, batch_size, hidden_size)
-
-
-class SimpleJoiner(Joiner):
-    def __init__(self, vocab_size:int, encoder_dim: int, config: DecoderConfig):
-        super().__init__()
-        joint_dim = config.joint_dim
-        predictor_dim = config.pred_dim
-
-        if joint_dim != encoder_dim:
-            self.enc_proj = nn.Linear(encoder_dim, joint_dim, bias=False)
-        else:
-            self.enc_proj = nn.Identity()
-
-        if joint_dim != predictor_dim:
-            self.pred_proj = nn.Linear(predictor_dim, joint_dim, bias=False)
-        else:
-            self.pred_proj = nn.Identity()
-
-        self.bias = nn.Parameter(torch.zeros(joint_dim))
-        self.out = nn.Linear(joint_dim, vocab_size)
-
-    def forward(self, encoder_output: Tensor, predictor_output: Tensor):
-        enc_proj = self.enc_proj(encoder_output).unsqueeze(2)
-        pred_proj = self.pred_proj(predictor_output).unsqueeze(1)
-
-        lattice = enc_proj + pred_proj + self.bias
-        x = torch.tanh(lattice)
-        logits = self.out(x)
-        return logits
