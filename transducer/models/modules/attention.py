@@ -35,9 +35,9 @@ def eager_attention_forward(
     key: torch.Tensor,
     value: torch.Tensor,
     attention_mask: Optional[torch.Tensor],
-    scaling: float,
-    dropout: float = 0.0,
-):
+    scaling: Optional[float] = None,
+    dropout: float = 0.0
+):  
     attn_weights = torch.matmul(query, key.transpose(2, 3)) * scaling
     if attention_mask is not None:
         mask = attention_mask[:, :, :, : key.shape[-2]]
@@ -109,10 +109,11 @@ class PositionalEncoding(nn.Module):
         dropout=0.1,
         max_len: int = 5000,
         dropout_rate_emb: float = 0.0,
+        xscale:bool = False
     ):
         super().__init__()
         self.d_model = hidden_size
-        self.xscale = math.sqrt(hidden_size)
+        self.xscale = xscale
         self.dropout = nn.Dropout(p=dropout)
         self.max_len = max_len
         self.dropout_emb = nn.Dropout(p=dropout_rate_emb)
@@ -141,7 +142,8 @@ class PositionalEncoding(nn.Module):
         self.create_pe(positions=positions)
 
     def forward(self, x: Tensor, cache_len=0):
-        x = x * self.xscale
+        if self.xscale:
+            x = x * self.xscale
 
         input_len = x.size(1) + cache_len
         center_pos = self.pe.size(1) // 2 + 1
@@ -155,7 +157,7 @@ class PositionalEncoding(nn.Module):
 
 class FastConformerAttention(nn.Module):
     def __init__(
-        self, num_heads, hidden_size: int, dropout: float, use_bias: bool = True
+        self, num_heads, hidden_size: int, dropout: float, use_bias: bool = True, attn_impl = 'eager'
     ):
         super().__init__()
         self.d_k = hidden_size // num_heads
@@ -170,6 +172,7 @@ class FastConformerAttention(nn.Module):
         self.linear_pos = nn.Linear(hidden_size, hidden_size, bias=use_bias)
         self.pos_bias_u = nn.Parameter(torch.FloatTensor(self.num_heads, self.d_k))
         self.pos_bias_v = nn.Parameter(torch.FloatTensor(self.num_heads, self.d_k))
+        self.attn_impl = attn_impl
 
     def rel_shift(self, x: Tensor):
         B, H, qlen, pos_len = x.size()
@@ -205,15 +208,28 @@ class FastConformerAttention(nn.Module):
         scale_factor = 1 / math.sqrt(q_with_bias_u.size(-1))
         matrix_bd = matrix_bd[:, :, :, : key.size(-2)] * scale_factor
 
-        output, _ = sdpa_attention_forward(
-            self,
-            query=q_with_bias_u,
-            key=key,
-            value=value,
-            attention_mask=matrix_bd,
-            scaling=None,
-            dropout=self.dropout,
-        )
+        if self.attn_impl == 'eager':
+
+            output, _ = eager_attention_forward(
+                self,
+                query=q_with_bias_u,
+                key=key,
+                value=value,
+                attention_mask=matrix_bd,
+                scaling=1/self.s_d_k,
+                dropout=self.dropout if self.training else 0.0,
+            )
+        else:
+            output = sdpa_attention_forward(
+                self,
+                query = q_with_bias_u,
+                key = key,
+                value = value,
+                attention_mask = matrix_bd,
+                scaling = None,
+                dropout=self.dropout if self.training else 0.0,
+            )
+
         output = output.reshape(n_batch, -1, self.num_heads * self.d_k)
         return self.linear_out(output)
 

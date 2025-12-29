@@ -20,17 +20,7 @@ class CausalConv1d(nn.Conv1d):
         device=None,
         dtype=None,
     ):
-        super().__init__(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
-            padding_mode=padding_mode,
-        )
+        
         if padding is None:
             self._left_padding = kernel_size - 1
             self._right_padding = stride - 1
@@ -62,8 +52,6 @@ class CausalConv1d(nn.Conv1d):
             groups=groups,
             bias=bias,
             padding_mode=padding_mode,
-            device=device,
-            dtype=dtype,
         )
 
     def update_cache(self, x, cache=None):
@@ -142,13 +130,11 @@ class CausalConv2D(nn.Conv2d):
 
 
 class ConformerConvolution(nn.Module):
-    def __init__(self, hidden_size, kernel_size, use_bias=False):
+    def __init__(self, hidden_size, kernel_size, norm_type = 'layer_norm',use_bias=False):
         super().__init__()
         self.d_model = hidden_size
         self.kernel_size = kernel_size
-        conv_context_size = (kernel_size - 1) // 2
-
-        self.pointwise_activation = nn.GLU(dim=1)
+        conv_context_size = [kernel_size - 1,0]
 
         self.pointwise_conv1 = nn.Conv1d(
             in_channels=hidden_size,
@@ -169,7 +155,12 @@ class ConformerConvolution(nn.Module):
             bias=use_bias,
         )
 
-        self.batch_norm = nn.BatchNorm1d(hidden_size)
+        if norm_type == 'layer_norm':
+            self.batch_norm = nn.LayerNorm(hidden_size)
+        elif norm_type == 'batch_norm':
+            self.batch_norm = nn.BatchNorm1d(hidden_size)
+        self.norm_type = norm_type
+
         self.activation = nn.SiLU()
         self.pointwise_conv2 = nn.Conv1d(
             in_channels=hidden_size,
@@ -180,17 +171,25 @@ class ConformerConvolution(nn.Module):
             bias=use_bias,
         )
 
-    def forward(self, x, cache=None):
+    def forward(self, x, pad_mask=None, cache=None):
         x = x.transpose(1, 2)
         x = self.pointwise_conv1(x)
-        x = self.pointwise_activation(x)
+        x = F.glu(x, dim = 1)
+
+        if pad_mask is not None:
+            x = x.masked_fill(pad_mask.unsqueeze(1), 0.0)
 
         x = self.depthwise_conv(x, cache=cache)
-        x = self.batch_norm(x)
+        if self.norm_type == 'layer_norm':
+            x = self.batch_norm(x.transpose(1, 2)).transpose(1, 2)
+        else:
+            x = self.batch_norm(x)
 
         x = self.activation(x)
         x = self.pointwise_conv2(x)
         x = x.transpose(1, 2)
+        if cache is None:
+            return x
         return x, cache
 
 

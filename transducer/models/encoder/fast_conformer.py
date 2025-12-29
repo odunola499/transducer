@@ -61,7 +61,7 @@ class ConformerLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm_out = nn.LayerNorm(hidden_size)
 
-    def forward(self, x, pos_emb=None):
+    def forward(self, x, pos_emb=None, pad_mask=None, cache=None):
         residual = x
         x = self.norm_feed_forward1(x)
         x = self.feed_forward1(x)
@@ -72,7 +72,10 @@ class ConformerLayer(nn.Module):
         residual += self.dropout(x)
 
         x = self.norm_conv(residual)
-        x, _ = self.conv(x)
+        if cache:
+            x, _ = self.conv(x, pad_mask=pad_mask, cache=cache)
+        else:
+            x = self.conv(x, pad_mask=pad_mask)
         residual += self.dropout(x)
 
         x = self.norm_feed_forward2(residual)
@@ -123,7 +126,7 @@ class ConformerEncoder(nn.Module):
 
         self.att_context_size = config.att_context_size
 
-    def forward(self, x, length: Tensor = None):
+    def forward(self, x, length: Tensor = None, return_lengths: bool = False):
         if length is None:
             length = x.new_full(
                 (x.size(0),), x.size(-1), dtype=torch.int64, device=x.device
@@ -133,9 +136,21 @@ class ConformerEncoder(nn.Module):
         x, length = self.pre_encode(x, lengths=length)
         x, pos_emb = self.pos_enc(x=x)
 
+        pad_mask = None
+        if length is not None:
+            max_len = x.size(1)
+            pad_mask = torch.arange(0, x.shape[1], device=x.device).expand(
+            length.size(0), -1
+        ) < length.unsqueeze(-1)
+            pad_mask = ~pad_mask
+
         for layer in self.layers:
-            x = layer(x=x, pos_emb=pos_emb)
-        x = self.out_proj(x)
+            x = layer(x=x, pos_emb=pos_emb, pad_mask=pad_mask)
+
+        x = x.transpose(1, 2)
+
+        if return_lengths:
+            return x, length
         return x
 
 

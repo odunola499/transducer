@@ -18,6 +18,41 @@ def calc_length(lengths, all_paddings, kernel_size, stride, ceil_mode, repeat_nu
             lengths = torch.floor(lengths)
     return lengths.to(dtype=torch.int)
 
+def apply_channel_mask(tensor, mask):
+    batch_size, channels, time, features = tensor.shape
+    expanded_mask = mask.unsqueeze(1).expand(batch_size, channels, time, features)
+    return tensor * expanded_mask
+
+def calculate_conv_output_size(input_size: torch.Tensor, kernel_size: int, stride: int, padding: tuple[int, int]):
+    return (input_size + padding[0] + padding[1] - kernel_size) // stride + 1
+
+class MaskedConvSequential(nn.Sequential):
+    def forward(self, x, lengths):
+        x = x.unsqueeze(1)
+        current_lengths = lengths.clone().float()
+        mask = self._create_mask(x, current_lengths.long())
+
+        for i, layer in enumerate(self):
+            x = apply_channel_mask(x, mask)
+
+            x = layer(x)
+            if hasattr(layer, 'stride') and layer.stride != (1, 1):
+                if hasattr(layer, "_left_padding"):
+                    padding = (layer._left_padding, layer._right_padding)
+                else:
+                    padding = layer.padding
+                current_lengths = calculate_conv_output_size(
+                    current_lengths, layer.kernel_size[0], layer.stride[0], padding
+                )
+                mask = self._create_mask(x, current_lengths.long())
+
+        x = apply_channel_mask(x, mask)
+        return x, current_lengths.long()
+
+    def _create_mask(self, tensor, lengths):
+        batch_size, channels, time, features = tensor.shape
+        time_mask = torch.arange(time, device=tensor.device).expand(batch_size, time) < lengths.unsqueeze(1)
+        return time_mask.unsqueeze(-1).expand(batch_size, time, features).to(tensor.dtype)
 
 class ConvSubsampling(nn.Module):
     def __init__(
@@ -98,10 +133,9 @@ class ConvSubsampling(nn.Module):
             config.hidden_size,
             bias=True,
         )
-        self.conv = nn.Sequential(*layers)
+        self.conv = MaskedConvSequential(*layers)
 
     def forward(self, x: Tensor, lengths: Tensor):
-        x = x.unsqueeze(1)
 
         x_ceil = 2**31 / self._conv_channels * self._stride * self._stride
         if torch.numel(x) > x_ceil:
@@ -140,8 +174,7 @@ class ConvSubsampling(nn.Module):
         )
 
     def conv_forward(self, x: Tensor, lengths: Tensor):
-        for layer in self.conv:
-            x = layer(x)
+        x, lengths = self.conv(x, lengths)
         return x, lengths
 
 
