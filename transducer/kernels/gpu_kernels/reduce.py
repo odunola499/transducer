@@ -39,7 +39,7 @@ def CTAReduce(tid: int, x, storage, count: int, R_opid: int):
 
     It is a device kernel to be called by other kernels.
 
-    The data will be read from the right segement recursively, and reduced (ROP) onto the left half.
+    The data will be read from the right segment recursively, and reduced (ROP) onto the left half.
     Operation continues while warp size is larger than a given offset.
     Beyond this offset, warp reduction is performed via `shfl_down_sync`, which halves the reduction
     space and sums the two halves at each call.
@@ -112,8 +112,8 @@ def _reduce_rows(I_opid: int, R_opid: int, acts, output, num_rows: int):
             without scaling.
         R_opid: Operator ID for reduction. See R_Op for more information.
             For this kernel, generally Maximum op is chosen. It reduces the kernel via max.
-        acts: Flatened activation matrix of shape [B * T * U * (V+1)].
-        output: Flatened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
+        acts: Flattened activation matrix of shape [B * T * U * (V+1)].
+        output: Flattened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
         num_rows: Vocabulary size (including blank token) - V+1.
     """
     tid = cuda.threadIdx.x
@@ -177,8 +177,8 @@ def _reduce_minus(I_opid: int, R_opid: int, acts, output, num_rows: int):
             with scaling.
         R_opid: Operator ID for reduction. See R_Op for more information.
             For this kernel, generally Add op is chosen. It reduces the kernel via summation.
-        acts: Flatened activation matrix of shape [B * T * U * (V+1)].
-        output: Flatened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
+        acts: Flattened activation matrix of shape [B * T * U * (V+1)].
+        output: Flattened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
         num_rows: Vocabulary size (including blank token) - V+1.
     """
     tid = cuda.threadIdx.x
@@ -247,8 +247,8 @@ def ReduceHelper(
     Args:
         I_opid: Operator ID for input. See I_Op for more information.
         R_opid: Operator ID for reduction. See R_Op for more information.
-        acts: Flatened activation matrix of shape [B * T * U * (V+1)].
-        output: Flatened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
+        acts: Flattened activation matrix of shape [B * T * U * (V+1)].
+        output: Flattened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
         num_rows: Vocabulary size (including blank token) - V+1.
             Represents the number of threads per block.
         num_cols: Flattened shape of activation matrix, without vocabulary dimension (B * T * U).
@@ -260,12 +260,16 @@ def ReduceHelper(
     if minus:
         grid_size = num_cols
         # call kernel
-        _reduce_minus[grid_size, CTA_REDUCE_SIZE, stream, 0](I_opid, R_opid, acts, output, num_rows)
+        _reduce_minus[grid_size, CTA_REDUCE_SIZE, stream, 0](
+            I_opid, R_opid, acts, output, num_rows
+        )
 
     else:
         grid_size = num_cols
         # call kernel
-        _reduce_rows[grid_size, CTA_REDUCE_SIZE, stream, 0](I_opid, R_opid, acts, output, num_rows)
+        _reduce_rows[grid_size, CTA_REDUCE_SIZE, stream, 0](
+            I_opid, R_opid, acts, output, num_rows
+        )
 
     return True
 
@@ -281,8 +285,8 @@ def reduce_exp(acts: torch.Tensor, denom, rows: int, cols: int, minus: bool, str
         - Warp Primitives [https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/]
 
     Args:
-        acts: Flatened activation matrix of shape [B * T * U * (V+1)].
-        output: Flatened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
+        acts: Flattened activation matrix of shape [B * T * U * (V+1)].
+        output: Flattened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
         rows: Vocabulary size (including blank token) - V+1.
             Represents the number of threads per block.
         cols: Flattened shape of activation matrix, without vocabulary dimension (B * T * U).
@@ -314,8 +318,8 @@ def reduce_max(acts: torch.Tensor, denom, rows: int, cols: int, minus: bool, str
         - Warp Primitives [https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/]
 
     Args:
-        acts: Flatened activation matrix of shape [B * T * U * (V+1)].
-        output: Flatened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
+        acts: Flattened activation matrix of shape [B * T * U * (V+1)].
+        output: Flattened output matrix of shape [B * T * U * (V+1)]. Data will be overwritten.
         rows: Vocabulary size (including blank token) - V+1.
             Represents the number of threads per block.
         cols: Flattened shape of activation matrix, without vocabulary dimension (B * T * U).

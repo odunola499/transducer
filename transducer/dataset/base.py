@@ -1,35 +1,37 @@
-from abc import abstractmethod, ABC
-
-import torch
-import numpy as np
-from torch.utils.data import Dataset, IterableDataset, get_worker_info
-from typing import Union
+from abc import ABC, abstractmethod
 from io import BytesIO
+from typing import Optional, Union
+
 import librosa
-from typing import Optional
+import numpy as np
+from torch import distributed as dist
+from torch.utils.data import Dataset, IterableDataset, get_worker_info
+from transformers import AutoFeatureExtractor
+
 from transducer.dataset.config import DatasetConfig
 from transducer.processor import Processor, Tokenizer
-from transformers import AutoFeatureExtractor
-from torch import distributed as dist
-
 
 FEATURE_EXTRACTORS = {
-    'wav2vec2': AutoFeatureExtractor.from_pretrained('facebook/wav2vec2-base'),
-    'wav2vecbert': AutoFeatureExtractor.from_pretrained('facebook/w2v-bert-2.0')
+    "wav2vec2": AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-base"),
+    "wav2vecbert": AutoFeatureExtractor.from_pretrained("facebook/w2v-bert-2.0"),
 }
+
+
 class BaseDataset(Dataset, ABC):
-    def __init__(self, config:DatasetConfig) -> None:
+    def __init__(self, config: DatasetConfig) -> None:
         super().__init__()
         self.config = config
         tokenizer_config = config.tokenizer_config
         tokenizer = Tokenizer(tokenizer_config)
         feature_extractor = FEATURE_EXTRACTORS[config.feature_extractor_type]
-        processor = Processor(feature_extractor = feature_extractor, tokenizer = tokenizer)
+        processor = Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
         self.processor = processor
 
         self.sample_rate = config.sample_rate
 
-    def load_audio(self, audio:Union[np.ndarray, bytes, str], orig_sr:Optional[int] = None) -> np.ndarray:
+    def load_audio(
+        self, audio: Union[np.ndarray, bytes, str], orig_sr: Optional[int] = None
+    ) -> np.ndarray:
         if isinstance(audio, np.ndarray):
             assert orig_sr is not None, "orig_sr must be provided for type numpy array"
 
@@ -45,27 +47,27 @@ class BaseDataset(Dataset, ABC):
 
         if orig_sr != self.sample_rate:
             audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=self.sample_rate)
-        audio = audio[:int(self.sample_rate * self.config.max_audio_length_ms * 0.001)]
+        audio = audio[: int(self.sample_rate * self.config.max_audio_length_ms * 0.001)]
         return audio
-
 
     @abstractmethod
     def _collate_fn(self, batch):
         raise NotImplementedError
 
+
 class StreamingBaseDataset(IterableDataset, ABC):
-    def __init__(self, config:DatasetConfig) -> None:
+    def __init__(self, config: DatasetConfig) -> None:
         super().__init__()
         self.config = config
         tokenizer_config = config.tokenizer_config
         tokenizer = Tokenizer(tokenizer_config)
         feature_extractor = FEATURE_EXTRACTORS[config.feature_extractor_type]
-        processor = Processor(feature_extractor = feature_extractor, tokenizer = tokenizer)
+        processor = Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
         self.processor = processor
 
         self.sample_rate = config.sample_rate
 
-    def should_yield(self, index:int) -> bool:
+    def should_yield(self, index: int) -> bool:
         worker_info = get_worker_info()
         if not dist.is_available() or not dist.is_initialized():
             return True
@@ -86,7 +88,9 @@ class StreamingBaseDataset(IterableDataset, ABC):
                 return True
             return False
 
-    def load_audio(self, audio:Union[np.ndarray, bytes, str], orig_sr:Optional[int] = None) -> np.ndarray:
+    def load_audio(
+        self, audio: Union[np.ndarray, bytes, str], orig_sr: Optional[int] = None
+    ) -> np.ndarray:
         if isinstance(audio, np.ndarray):
             assert orig_sr is not None, "orig_sr must be provided for type numpy array"
 
@@ -103,9 +107,8 @@ class StreamingBaseDataset(IterableDataset, ABC):
         if orig_sr != self.sample_rate:
             audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=self.sample_rate)
 
-        audio = audio[:int(self.sample_rate * self.config.max_audio_length_ms * 0.001)]
+        audio = audio[: int(self.sample_rate * self.config.max_audio_length_ms * 0.001)]
         return audio
-
 
     @abstractmethod
     def _collate_fn(self, batch):

@@ -13,7 +13,9 @@ class EagerRNNTLoss(Loss):
         self.blank_id = blank_id
         self.reduction = reduction
 
-    def forward(self, lattice: Tensor, labels: Tensor, lattice_lens: Tensor, label_lens: Tensor):
+    def forward(
+        self, lattice: Tensor, labels: Tensor, lattice_lens: Tensor, label_lens: Tensor
+    ):
         losses = -(self.compute_forward_prob(lattice, labels, lattice_lens, label_lens))
         if self.reduction == "mean":
             return torch.mean(losses)
@@ -44,7 +46,9 @@ class EagerRNNTLoss(Loss):
                 else:
                     if t == 0:
                         gathered = torch.gather(
-                            lattice[:, t, u - 1], dim=1, index=labels[:, u - 1].view(-1, 1)
+                            lattice[:, t, u - 1],
+                            dim=1,
+                            index=labels[:, u - 1].view(-1, 1),
                         ).reshape(-1)
                         log_alpha[:, t, u] = log_alpha[:, t, u - 1] + gathered
 
@@ -52,7 +56,8 @@ class EagerRNNTLoss(Loss):
                         log_alpha[:, t, u] = torch.logsumexp(
                             torch.stack(
                                 [
-                                    log_alpha[:, t - 1, u] + lattice[:, t - 1, u, self.blank_id],
+                                    log_alpha[:, t - 1, u]
+                                    + lattice[:, t - 1, u, self.blank_id],
                                     log_alpha[:, t, u - 1]
                                     + torch.gather(
                                         lattice[:, t, u - 1],

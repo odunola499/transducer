@@ -9,22 +9,26 @@ from torch import Tensor, nn
 class EncoderOutput:
     last_hidden_state: Tensor
 
+
 @dataclass
 class Hypothesis:
-    tokens:Tensor
-    pred_out:Tensor
-    pred_state:Tensor
-    score:Tensor
+    tokens: Tensor
+    pred_out: Tensor
+    pred_state: Tensor
+    score: Tensor
+
 
 @dataclass
 class GenerationOutput:
-    ids:Tensor
+    ids: Tensor
     labels: Union[List[str], List[int]]
+
 
 @dataclass
 class ModelOutput:
-    loss:Tensor
-    lattice:Tensor
+    loss: Tensor
+    lattice: Tensor
+
 
 class Encoder(nn.Module, ABC):
     @abstractmethod
@@ -33,6 +37,7 @@ class Encoder(nn.Module, ABC):
 
     def encoder_name(self):
         raise NotImplementedError
+
 
 class Predictor(nn.Module, ABC):
     @abstractmethod
@@ -43,8 +48,8 @@ class Predictor(nn.Module, ABC):
     def init_state(self, batch_size: int):
         raise NotImplementedError
 
-class Joiner(nn.Module, ABC):
-    ...
+
+class Joiner(nn.Module, ABC): ...
 
 
 class Loss(nn.modules.loss._Loss, nn.Module):

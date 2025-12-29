@@ -126,7 +126,9 @@ class GPUTDT(GPURNNT):
             label_grads *= 0.0  # zero grads
             duration_grads *= 0.0  # zero grads
 
-        _, (denom, alphas, betas, llForward, llBackward, durations) = self._prepare_workspace()
+        _, (denom, alphas, betas, llForward, llBackward, durations) = (
+            self._prepare_workspace()
+        )
 
         ######## START EXECUTION ########
 
@@ -136,7 +138,9 @@ class GPUTDT(GPURNNT):
         if r < self.omega:
             # Compute alphas
 
-            gpu_rnnt_kernel.compute_alphas_kernel[self.minibatch_, self.maxU_, self.stream_, 0](
+            gpu_rnnt_kernel.compute_alphas_kernel[
+                self.minibatch_, self.maxU_, self.stream_, 0
+            ](
                 label_acts,
                 denom,
                 alphas,
@@ -154,7 +158,9 @@ class GPUTDT(GPURNNT):
         else:
             # Compute alphas
 
-            gpu_rnnt_kernel.compute_tdt_alphas_kernel[self.minibatch_, self.maxU_, self.stream_, 0](
+            gpu_rnnt_kernel.compute_tdt_alphas_kernel[
+                self.minibatch_, self.maxU_, self.stream_, 0
+            ](
                 label_acts,
                 duration_acts,
                 denom,
@@ -177,7 +183,9 @@ class GPUTDT(GPURNNT):
             # Compute betas
 
             if r < self.omega:
-                gpu_rnnt_kernel.compute_betas_kernel[self.minibatch_, self.maxU_, self.stream_, 0](
+                gpu_rnnt_kernel.compute_betas_kernel[
+                    self.minibatch_, self.maxU_, self.stream_, 0
+                ](
                     label_acts,
                     denom,
                     betas,
@@ -349,11 +357,20 @@ class GPUTDT(GPURNNT):
             return utils.RNNTStatus.RNNT_STATUS_INVALID_VALUE
 
         return self.compute_cost_and_score(
-            label_acts, duration_acts, None, None, costs, pad_labels, label_lengths, input_lengths
+            label_acts,
+            duration_acts,
+            None,
+            None,
+            costs,
+            pad_labels,
+            label_lengths,
+            input_lengths,
         )
 
     def _prepare_workspace(self) -> Tuple[int, Tuple[torch.Tensor, ...]]:
-        used_offset, (denom, alphas, betas, llForward, llBackward) = super()._prepare_workspace()
+        used_offset, (denom, alphas, betas, llForward, llBackward) = (
+            super()._prepare_workspace()
+        )
 
         durations = self.tdt_workspace[: self.num_durations]
 

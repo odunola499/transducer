@@ -1,4 +1,4 @@
-from transducer.config import Config, Args
+from transducer.config import Args, Config
 
 __all__ = [
     "Args",

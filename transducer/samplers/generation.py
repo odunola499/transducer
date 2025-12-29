@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List
 
 import torch
 from torch import Tensor
@@ -68,7 +68,6 @@ class GenerationMixin(ABC):
     def _greedy_decode(self, audio: Tensor) -> GenerationOutput:
         feature_extractor = self.get_feature_extractor()
         encoder = self.get_encoder()
-        predictor = self.get_predictor()
 
         features = feature_extractor(audio)
         if isinstance(features, dict):
@@ -83,7 +82,9 @@ class GenerationMixin(ABC):
         encoder_output = encoder(features)
         return self._greedy_decode_from_encoder_output(encoder_output)
 
-    def _greedy_decode_from_encoder_output(self, encoder_output: Tensor) -> GenerationOutput:
+    def _greedy_decode_from_encoder_output(
+        self, encoder_output: Tensor
+    ) -> GenerationOutput:
         tokenizer = self.get_tokenizer()
         predictor = self.get_predictor()
 
@@ -109,7 +110,7 @@ class GenerationMixin(ABC):
             t += 1
             results.append(hyp)
         results = torch.concat(results, dim=-1)
-        texts = tokenizer.decode(results.to('cpu').tolist())
+        texts = tokenizer.decode(results.to("cpu").tolist())
 
         return GenerationOutput(ids=results, labels=texts)
 
@@ -144,13 +145,14 @@ class GenerationMixin(ABC):
         if hyp:
             hyp = torch.concat(hyp, dim=-1)
         else:
-            hyp = torch.empty((frame.shape[0], 0), dtype=torch.long, device=frame.device)
+            hyp = torch.empty(
+                (frame.shape[0], 0), dtype=torch.long, device=frame.device
+            )
         return hyp, pred_out, pred_state
 
     def _beam_decode(self, audio: Tensor) -> GenerationOutput:
         feature_extractor = self.get_feature_extractor()
         encoder = self.get_encoder()
-        predictor = self.get_predictor()
 
         features = feature_extractor(audio)
         if isinstance(features, dict):
@@ -165,14 +167,19 @@ class GenerationMixin(ABC):
         encoder_output = encoder(features)
         return self._beam_decode_from_encoder_output(encoder_output)
 
-    def _beam_decode_from_encoder_output(self, encoder_output: Tensor) -> GenerationOutput:
+    def _beam_decode_from_encoder_output(
+        self, encoder_output: Tensor
+    ) -> GenerationOutput:
         tokenizer = self.get_tokenizer()
         predictor = self.get_predictor()
 
         batch_size, frame_size = encoder_output.shape[:-1]
         blank_id = self.get_blank_id()
         start_ids = torch.full(
-            (batch_size, 1), fill_value=blank_id, dtype=torch.long, device=encoder_output.device
+            (batch_size, 1),
+            fill_value=blank_id,
+            dtype=torch.long,
+            device=encoder_output.device,
         )
 
         pred_state = predictor.init_state(batch_size)
@@ -184,7 +191,9 @@ class GenerationMixin(ABC):
 
         hyps = [
             Hypothesis(
-                tokens=torch.empty((batch_size, 0), dtype=torch.long, device=encoder_output.device),
+                tokens=torch.empty(
+                    (batch_size, 0), dtype=torch.long, device=encoder_output.device
+                ),
                 pred_out=pred_out,
                 pred_state=pred_state,
                 score=torch.zeros(batch_size, 1, device=encoder_output.device),
@@ -217,7 +226,9 @@ class GenerationMixin(ABC):
             hyp.score = hyp.score + blank_score
             new_hyps.append(hyp)
 
-            topk_scores, topk_ids = logp.squeeze(1).squeeze(1).topk(beam_size + 1, dim=-1)
+            topk_scores, topk_ids = (
+                logp.squeeze(1).squeeze(1).topk(beam_size + 1, dim=-1)
+            )
 
             for i in range(topk_ids.size(-1)):
                 token = topk_ids[:, i]

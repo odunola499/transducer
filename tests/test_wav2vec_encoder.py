@@ -1,13 +1,13 @@
 import torch
+from models.encoder import wav2vec
 
 from transducer.models.config import Wav2VecSmallConfig
-from models.encoder import wav2vec
 
 
 def _expected_conv_length(config: Wav2VecSmallConfig, input_length: int) -> int:
     length = input_length
 
-    for kernel, stride in zip(config.conv_kernel, config.conv_stride):
+    for kernel, stride in zip(config.conv_kernel, config.conv_stride, strict=False):
         length = (length - kernel) // stride + 1
 
     return length
@@ -152,9 +152,9 @@ def test_attention_qkv_projection_chunks_correctly(monkeypatch):
     hidden_states = torch.randn(batch, seq_len, config.hidden_size)
 
     def assert_qkv(module, query, key, value, attention_mask, scaling, dropout):
-        expected = hidden_states.view(batch, seq_len, config.num_attention_heads, -1).permute(
-            0, 2, 1, 3
-        )
+        expected = hidden_states.view(
+            batch, seq_len, config.num_attention_heads, -1
+        ).permute(0, 2, 1, 3)
 
         assert torch.allclose(query, expected)
 

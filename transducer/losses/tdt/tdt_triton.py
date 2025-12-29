@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Optional
 
 import torch
 from torch.autograd import Function
@@ -19,7 +19,7 @@ class _TDTTriton(Function):
         act_lens: torch.Tensor,
         label_lens: torch.Tensor,
         blank: int,
-        durations: Sequence[int],
+        durations,
         reduction: str,
         fastemit_lambda: float,
         clamp: float,
@@ -40,7 +40,7 @@ class _TDTTriton(Function):
             act_lens,
             label_lens,
             blank,
-            list(durations),
+            durations,
             fastemit_lambda,
             clamp,
             sigma,
@@ -48,8 +48,8 @@ class _TDTTriton(Function):
         )
         costs = -loglikes * (1.0 + fastemit_lambda)
         ctx.reduction = reduction
-        ctx.batch_size = label_acts.shape[0]
         ctx.save_for_backward(label_grads, duration_grads)
+        ctx.batch_size = label_acts.shape[0]
 
         if reduction == "sum":
             return costs.sum().unsqueeze(-1)
@@ -93,7 +93,7 @@ class TDTTritonLoss(Loss):
     def __init__(
         self,
         blank_id: int,
-        durations: Optional[Sequence[int]] = None,
+        durations=None,
         reduction: str = "mean",
         fastemit_lambda: float = 0.0,
         clamp: float = 0.0,
@@ -102,12 +102,12 @@ class TDTTritonLoss(Loss):
     ):
         super().__init__()
         self.blank = blank_id
-        self.durations = list(durations) if durations is not None else []
+        self.durations = durations if durations is not None else []
         self.reduction = reduction
         self.fastemit_lambda = fastemit_lambda
         self.clamp = float(clamp) if clamp > 0 else 0.0
-        self.sigma = float(sigma)
-        self.omega = float(omega)
+        self.sigma = sigma
+        self.omega = omega
 
     def forward(
         self,
@@ -121,14 +121,15 @@ class TDTTritonLoss(Loss):
             act_lens = torch.full(
                 (batch_size,), num_frames, device=acts.device, dtype=torch.long
             )
-        if not self.durations:
-            raise RuntimeError("Triton TDT requires a non-empty durations list.")
 
+        label_size = acts.shape[-1] - len(self.durations)
         label_acts, duration_acts = torch.split(
-            acts, [acts.shape[-1] - len(self.durations), len(self.durations)], dim=-1
+            acts, [label_size, len(self.durations)], dim=-1
         )
         label_acts = label_acts.contiguous()
-        duration_acts = torch.nn.functional.log_softmax(duration_acts, dim=-1).contiguous()
+        duration_acts = torch.nn.functional.log_softmax(
+            duration_acts, dim=-1
+        ).contiguous()
 
         return _TDTTriton.apply(
             label_acts,

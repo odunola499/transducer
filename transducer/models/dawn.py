@@ -1,18 +1,20 @@
-import torch
-from torch import Tensor
 from typing import Optional
 
+import torch
+from torch import Tensor
+
+from transducer.losses import LOSSES
 from transducer.models.base import BaseModel
 from transducer.models.config import ModelConfig, Wav2Vec2BertConfig, Wav2VecConfig
-from transducer.losses import LOSSES
 from transducer.models.decoder.joiner import SimpleJoiner
 from transducer.models.decoder.predictor import RNNPredictor
 from transducer.models.encoder.wav2vec import Wav2VecModel
 from transducer.models.encoder.wav2vec2bert import Wav2Vec2BertModel
 from transducer.samplers import GenerationMixin
 
+
 class DawnModel(BaseModel, GenerationMixin):
-    def __init__(self, vocab_size:int, config: ModelConfig):
+    def __init__(self, vocab_size: int, config: ModelConfig):
         super().__init__(config)
         self.model_name = config.model_name
         # Place blank token at the end of the vocabulary space
@@ -46,11 +48,13 @@ class DawnModel(BaseModel, GenerationMixin):
             self.encoder = Wav2VecModel(encoder_config)
         else:
             raise ValueError(f"Unsupported encoder_config type: {type(encoder_config)}")
-        self.predictor = RNNPredictor(decoder_config, vocab_size=self.vocab_size_with_blank)
+        self.predictor = RNNPredictor(
+            decoder_config, vocab_size=self.vocab_size_with_blank
+        )
         self.joiner = SimpleJoiner(
             self.vocab_size_with_blank,
             encoder_dim=encoder_config.hidden_size,
-            config=decoder_config
+            config=decoder_config,
         )
 
     def get_feature_extractor(self):
@@ -64,11 +68,11 @@ class DawnModel(BaseModel, GenerationMixin):
         raise NotImplementedError("tokenizer is not set on the model.")
 
     def forward(
-            self,
-            audio_features:Tensor,
-            labels:Tensor,
-            label_lens:Tensor,
-            audio_lens:Optional[Tensor] = None,
+        self,
+        audio_features: Tensor,
+        labels: Tensor,
+        label_lens: Tensor,
+        audio_lens: Optional[Tensor] = None,
     ):
         encoder_outputs = self.encoder(audio_features)
         predictor_outputs, _ = self.predictor(labels)
@@ -84,7 +88,9 @@ class DawnModel(BaseModel, GenerationMixin):
             "logits": logits,
         }
 
-    def compute_loss(self, lattice:Tensor, labels:Tensor, act_lens:Tensor, label_lens:Tensor):
+    def compute_loss(
+        self, lattice: Tensor, labels: Tensor, act_lens: Tensor, label_lens: Tensor
+    ):
         lattice = lattice.float()
         if self.config.loss_type in {"rnnt", "rnnt_triton"}:
             self._assert_rnnt_inputs(lattice, labels, act_lens, label_lens)
@@ -104,7 +110,9 @@ class DawnModel(BaseModel, GenerationMixin):
         label_lens: Tensor,
     ) -> None:
         if lattice.dim() != 4:
-            raise RuntimeError(f"RNNT logits must be 4D, got shape {tuple(lattice.shape)}")
+            raise RuntimeError(
+                f"RNNT logits must be 4D, got shape {tuple(lattice.shape)}"
+            )
         if not torch.isfinite(lattice).all().item():
             raise RuntimeError("RNNT logits contain NaN/Inf values.")
 

@@ -1,7 +1,5 @@
 from typing import Any, Dict, Optional, Union
 
-from transformers import AutoFeatureExtractor
-
 
 class Processor:
     def __init__(self, feature_extractor, tokenizer):
@@ -21,7 +19,9 @@ class Processor:
     ):
         if sampling_rate is not None:
             kwargs["sampling_rate"] = sampling_rate
-        return self.feature_extractor(audio, return_tensors=return_tensors, padding = True, **kwargs)
+        return self.feature_extractor(
+            audio, return_tensors=return_tensors, padding=True, **kwargs
+        )
 
     def tokenize(self, text):
         return self.tokenizer.encode(text)
@@ -46,7 +46,10 @@ class Processor:
         output: Dict[str, Any] = {}
         if audio is not None:
             output["features"] = self.extract_features(
-                audio, sampling_rate=sampling_rate, return_tensors=return_tensors, **kwargs
+                audio,
+                sampling_rate=sampling_rate,
+                return_tensors=return_tensors,
+                **kwargs,
             )
         if text is not None:
             output["input_ids"] = self.tokenize(text)

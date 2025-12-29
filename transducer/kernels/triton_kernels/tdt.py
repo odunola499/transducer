@@ -1,25 +1,63 @@
 from __future__ import annotations
 
-from typing import Tuple
 import random
+from typing import Tuple
 
 import torch
-import triton
-import triton.language as tl
 
 from transducer.kernels.triton_kernels.rnnt import rnnt_loss_triton
 
+try:
+    import triton
+    import triton.language as tl
+except Exception:
+    triton = None
+    tl = None
+
+
+def _missing_triton(*_args, **_kwargs):
+    raise ImportError("Triton is not available. Install triton to use triton kernels.")
+
+
+if triton is None:
+
+    class _TritonKernelStub:
+        def __init__(self, _fn=None):
+            self._fn = _fn
+
+        def __call__(self, *_args, **_kwargs):
+            _missing_triton()
+
+        def __getitem__(self, _grid):
+            def launcher(*_args, **_kwargs):
+                _missing_triton()
+
+            return launcher
+
+    def triton_jit(*jit_args, **jit_kwargs):
+        def decorator(_fn):
+            return _TritonKernelStub(_fn)
+
+        if jit_args and callable(jit_args[0]) and not jit_kwargs:
+            return decorator(jit_args[0])
+        return decorator
+
+    def triton_cdiv(*_args, **_kwargs):
+        _missing_triton()
+else:
+    triton_jit = triton.jit
+    triton_cdiv = triton.cdiv
 
 NEG_INF = -1.0e30
 
 
-@triton.jit
+@triton_jit
 def _logsumexp_pair(a, b):
     m = tl.maximum(a, b)
     return m + tl.log(tl.exp(a - m) + tl.exp(b - m))
 
 
-@triton.jit
+@triton_jit
 def _tdt_alpha_kernel(
     log_probs_ptr,
     duration_acts_ptr,
@@ -78,7 +116,9 @@ def _tdt_alpha_kernel(
                                 other=neg_inf,
                             )
                             candidate = alpha_prev + logp_blank - sigma + logp_dur
-                            val = _logsumexp_pair(val, tl.where(valid, candidate, neg_inf))
+                            val = _logsumexp_pair(
+                                val, tl.where(valid, candidate, neg_inf)
+                            )
                         tl.store(alpha_base + t * maxU + 0, val, mask=in_range)
                 elif t == 0:
                     dur0 = tl.load(durations_ptr + 0).to(tl.int32)
@@ -130,7 +170,9 @@ def _tdt_alpha_kernel(
                             other=neg_inf,
                         )
                         candidate = alpha_prev + logp_blank - sigma + logp_dur
-                        no_emit = _logsumexp_pair(no_emit, tl.where(valid, candidate, neg_inf))
+                        no_emit = _logsumexp_pair(
+                            no_emit, tl.where(valid, candidate, neg_inf)
+                        )
 
                     emit = tl.full((), neg_inf, tl.float32)
                     label_idx = tl.where(u_t > 0, u_t - 1, 0)
@@ -160,7 +202,9 @@ def _tdt_alpha_kernel(
                             other=neg_inf,
                         )
                         candidate = alpha_prev + logp_label - sigma + logp_dur
-                        emit = _logsumexp_pair(emit, tl.where(valid, candidate, neg_inf))
+                        emit = _logsumexp_pair(
+                            emit, tl.where(valid, candidate, neg_inf)
+                        )
 
                     out = _logsumexp_pair(emit, no_emit)
                     tl.store(alpha_base + t * maxU + u, out, mask=in_range)
@@ -192,7 +236,7 @@ def _tdt_alpha_kernel(
     tl.store(loglikes_ptr + b, loglike, mask=in_bounds)
 
 
-@triton.jit
+@triton_jit
 def _tdt_beta_kernel(
     log_probs_ptr,
     duration_acts_ptr,
@@ -330,7 +374,9 @@ def _tdt_beta_kernel(
                         candidate = beta_down + logp_blank + logp_dur - sigma
                         no_emit = _logsumexp_pair(
                             no_emit,
-                            tl.where(in_range & (d > 0) & (t_plus < T), candidate, neg_inf),
+                            tl.where(
+                                in_range & (d > 0) & (t_plus < T), candidate, neg_inf
+                            ),
                         )
 
                     emit = tl.full((), neg_inf, tl.float32)
@@ -367,7 +413,7 @@ def _tdt_beta_kernel(
             tl.store(beta_base + t * maxU + u, val, mask=in_range)
 
 
-@triton.jit
+@triton_jit
 def _tdt_label_grad_kernel(
     log_probs_ptr,
     duration_acts_ptr,
@@ -495,7 +541,7 @@ def _tdt_label_grad_kernel(
     tl.store(base_grad + v_offsets, grad, mask=valid)
 
 
-@triton.jit
+@triton_jit
 def _tdt_duration_grad_kernel(
     log_probs_ptr,
     duration_acts_ptr,
@@ -542,9 +588,7 @@ def _tdt_duration_grad_kernel(
 
     alpha = tl.load(base_alpha, mask=in_range, other=0.0)
     loglike = tl.load(loglikes_ptr + pid_b)
-    logpk_blank = (
-        tl.load(base_logp + blank_id, mask=in_range, other=0.0) - sigma
-    )
+    logpk_blank = tl.load(base_logp + blank_id, mask=in_range, other=0.0) - sigma
 
     label_idx = tl.where(u_t < (U - 1), u_t, 0)
     label = tl.load(label_base + label_idx, mask=in_range & (u_t < (U - 1)), other=0)
@@ -677,7 +721,7 @@ def _launch_tdt_label_grads(
     B, maxT, maxU, V = log_probs.shape
     label_grads = torch.zeros_like(log_probs)
     num_durations = durations.numel()
-    grid = (maxT * maxU, B, triton.cdiv(V, block_v))
+    grid = (maxT * maxU, B, triton_cdiv(V, block_v))
     label_stride = labels.shape[1]
     _tdt_label_grad_kernel[grid](
         log_probs,
@@ -723,7 +767,7 @@ def _launch_tdt_duration_grads(
     duration_grads = torch.zeros_like(duration_acts)
     if num_durations == 0:
         return duration_grads
-    grid = (maxT * maxU, B, triton.cdiv(num_durations, block_d))
+    grid = (maxT * maxU, B, triton_cdiv(num_durations, block_d))
     label_stride = labels.shape[1]
     _tdt_duration_grad_kernel[grid](
         log_probs,
@@ -768,6 +812,10 @@ def tdt_loss_triton(
     torch.Tensor,
     torch.Tensor,
 ]:
+    if triton is None:
+        raise ImportError(
+            "Triton is not available. Install triton to use triton kernels."
+        )
     if label_acts.device.type != "cuda":
         raise RuntimeError("Triton TDT only supports CUDA tensors.")
     if label_acts.dtype != torch.float32:

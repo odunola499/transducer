@@ -10,7 +10,9 @@ from transducer.models.config import DecoderConfig
 class RNNPredictor(Predictor):
     def __init__(self, config: DecoderConfig, vocab_size: Optional[int] = None):
         super().__init__()
-        effective_vocab_size = vocab_size if vocab_size is not None else config.vocab_size
+        effective_vocab_size = (
+            vocab_size if vocab_size is not None else config.vocab_size
+        )
         self.text_embed = nn.Embedding(effective_vocab_size, config.embed_dim)
         self.rnn_type = config.rnn_type
         if "gru" in config.rnn_type:

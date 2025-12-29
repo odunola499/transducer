@@ -1,5 +1,7 @@
 from typing import Literal, Optional
+
 from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr
+
 from transducer.config import Args
 
 
@@ -12,9 +14,11 @@ class EncoderConfig(Args):
 
 
 class Wav2VecSmallConfig(EncoderConfig):
-    model_name:StrictStr = 'wav2vec2small'
+    model_name: StrictStr = "wav2vec2small"
     dropout: StrictFloat = 0.1
-    conv_dim: list[StrictInt] = Field(default_factory=lambda: [512, 512, 512, 512, 512, 512, 512])
+    conv_dim: list[StrictInt] = Field(
+        default_factory=lambda: [512, 512, 512, 512, 512, 512, 512]
+    )
     conv_kernel: list[StrictInt] = Field(default_factory=lambda: [10, 3, 3, 3, 3, 2, 2])
     conv_stride: list[StrictInt] = Field(default_factory=lambda: [5, 2, 2, 2, 2, 2, 2])
     num_feat_extract_layers: StrictInt = 7
@@ -34,7 +38,7 @@ class Wav2VecSmallConfig(EncoderConfig):
 
 
 class Wav2VecLargeConfig(Wav2VecSmallConfig):
-    model_name:StrictStr = 'wav2veclarge'
+    model_name: StrictStr = "wav2veclarge"
     activation_dropout: StrictFloat = 0.1
     apply_spec_augment: StrictBool = True
     attention_dropout: StrictFloat = 0.1
@@ -56,11 +60,39 @@ class Wav2VecLargeConfig(Wav2VecSmallConfig):
     proj_codevector_dim: StrictInt = 768
 
 
+class FastConformerConfig(EncoderConfig):
+    hidden_size: StrictInt = 512
+    num_hidden_layers: StrictInt = 17
+    ff_expansion_factor: StrictInt = 4
+    feat_in: int = 128
+    use_bias: StrictBool = False
+    model_name: StrictStr = "fastconformer"
+    spec_augment_freq_masks: int = 2
+    spec_augment_time_masks: int = 2
+    spec_augment_freq_widths: int = 2
+    spec_augment_time_widths: float = 0.05
+
+    subsampling_factor: int = 8
+    subsampling_conv_channels: int = 256
+    causal_subsampling: bool = False
+
+    num_heads: int = 8
+    att_context_size: list = Field(default_factory=lambda: [-1, -1])
+    pos_emb_max_len: int = 5000
+
+    conv_kernel_size: StrictInt = 9
+    conv_context_size: list = None
+    dropout: float = 0.1
+    dropout_pre_encoder: float = 0.1
+    dropout_emb: float = 0.0
+    dropout_att: float = 0.1
+
+
 Wav2VecConfig = Wav2VecSmallConfig | Wav2VecLargeConfig
 
 
 class Wav2Vec2BertConfig(EncoderConfig):
-    model_name:StrictStr = 'wav2vec2bert'
+    model_name: StrictStr = "wav2vec2bert"
     activation_dropout: StrictFloat = 0.0
     apply_spec_augment: StrictBool = False
     attention_dropout: StrictFloat = 0.0
@@ -88,24 +120,24 @@ class Wav2Vec2BertConfig(EncoderConfig):
 
 
 class DecoderConfig(Args):
-    rnn_type:Literal['gru','lstm'] = 'gru'
+    rnn_type: Literal["gru", "lstm"] = "gru"
     embed_dim: StrictInt
     hidden_dim: StrictInt = 1024
     pred_dim: StrictInt = 640
     joint_dim: StrictInt = 640
     num_layers: StrictInt
     dropout: StrictFloat
-    vocab_size:StrictInt = 1024
+    vocab_size: StrictInt = 1024
 
 
 class ModelConfig(Args):
-    model_name:StrictStr # Used for logging etc
-    loss_type:Literal['tdt','tdt_triton','rnnt','rnnt_triton'] = 'rnnt'
-    loss_duration:Optional[list[StrictInt]] = None
+    model_name: StrictStr  # Used for logging etc
+    loss_type: Literal["tdt", "tdt_triton", "rnnt", "rnnt_triton"] = "rnnt"
+    loss_duration: Optional[list[StrictInt]] = None
     fastemit_lambda: StrictFloat = 0.0
     # If None, blank_id will be set to decoder_config.vocab_size (i.e., after tokens).
     blank_id: Optional[StrictInt] = None
-    loss_reduction:Literal['sum','mean'] = 'sum'
-    sampler_type:Literal['greedy_search','beam_search'] = 'greedy_search'
+    loss_reduction: Literal["sum", "mean"] = "sum"
+    sampler_type: Literal["greedy_search", "beam_search"] = "greedy_search"
     encoder_config: Wav2VecSmallConfig | Wav2VecLargeConfig | Wav2Vec2BertConfig
     decoder_config: DecoderConfig

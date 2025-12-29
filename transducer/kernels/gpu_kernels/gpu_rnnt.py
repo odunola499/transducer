@@ -30,15 +30,18 @@ class GPURNNT:
 
         Args:
             minibatch: Int representing the batch size.
-            maxT: The maximum possible acoustic sequence length. Represents T in the logprobs tensor.
+            maxT: The maximum possible acoustic sequence length. Represents T in the logprobs
+                tensor.
             maxU: The maximum possible target sequence length. Represents U in the logprobs tensor.
             alphabet_size: The vocabulary dimension V+1 (inclusive of RNNT blank).
-            workspace: An allocated chunk of memory that will be sliced off and reshaped into required
-                blocks used as working memory.
-            blank: Index of the RNNT blank token in the vocabulary. Generally the first or last token in the vocab.
+            workspace: An allocated chunk of memory that will be sliced off and reshaped into
+                required blocks used as working memory.
+            blank: Index of the RNNT blank token in the vocabulary. Generally the first or last
+                token in the vocab.
             fastemit_lambda: Float scaling factor for FastEmit regularization. Refer to
                 FastEmit: Low-latency Streaming ASR with Sequence-level Emission Regularization.
-            clamp: Float value. When set to value >= 0.0, will clamp the gradient to [-clamp, clamp].
+            clamp: Float value. When set to value >= 0.0, will clamp the gradient to
+                [-clamp, clamp].
             num_threads: Number of OMP threads to launch.
             stream: Numba Cuda Stream.
         """
@@ -69,8 +72,8 @@ class GPURNNT:
         and stores the result in denom.
 
         Args:
-            acts: Activation tensor of shape [B, T, U, V+1]. The input must be represented as a flat tensor
-                of shape [B * T * U * (V+1)] to allow pointer indexing.
+            acts: Activation tensor of shape [B, T, U, V+1]. The input must be represented as
+                a flat tensor of shape [B * T * U * (V+1)] to allow pointer indexing.
             denom: A zero tensor of same shape as acts.
 
         Updates:
@@ -110,10 +113,13 @@ class GPURNNT:
         Args:
             acts: A flattened tensor of shape [B, T, U, V+1] representing the activation matrix.
             grad: A flattented zero tensor of same shape as acts.
-            costs: A zero vector of length B which will be updated inplace with the log probability costs.
+            costs: A zero vector of length B which will be updated inplace with the log
+                probability costs.
             flat_labels: A flattened matrix of labels of shape [B, U]
-            label_lengths: A vector of length B that contains the original lengths of the acoustic sequence.
-            input_lengths: A vector of length B that contains the original lengths of the target sequence.
+            label_lengths: A vector of length B that contains the original lengths of the
+                acoustic sequence.
+            input_lengths: A vector of length B that contains the original lengths of the target
+                sequence.
 
         Updates:
             This will launch kernels that will update inline the following variables:
@@ -128,13 +134,17 @@ class GPURNNT:
         if training:
             grads *= 0.0  # zero grads
 
-        used_offset, (denom, alphas, betas, llForward, llBackward) = self._prepare_workspace()
+        used_offset, (denom, alphas, betas, llForward, llBackward) = (
+            self._prepare_workspace()
+        )
 
         ######## START EXECUTION ########
         self.log_softmax(acts, denom)
 
         # Compute alphas
-        gpu_rnnt_kernel.compute_alphas_kernel[self.minibatch_, self.maxU_, self.stream_, 0](
+        gpu_rnnt_kernel.compute_alphas_kernel[
+            self.minibatch_, self.maxU_, self.stream_, 0
+        ](
             acts,
             denom,
             alphas,
@@ -151,7 +161,9 @@ class GPURNNT:
 
         if training:
             # Compute betas
-            gpu_rnnt_kernel.compute_betas_kernel[self.minibatch_, self.maxU_, self.stream_, 0](
+            gpu_rnnt_kernel.compute_betas_kernel[
+                self.minibatch_, self.maxU_, self.stream_, 0
+            ](
                 acts,
                 denom,
                 betas,
@@ -193,8 +205,9 @@ class GPURNNT:
         # // cost copy, negate (for log likelihood) and update with additional regularizers
         # This needs to be done via CUDA, because we used temporary memory llForward
         # passed to alpha, which was updated with log likelihoods.
-        # But copying this data into a pytorch pointer is more difficult (numba api is one way)
-        # Therefore launch a pointwise CUDA kernel to update the costs inplace from data of llForward
+        # But copying this data into a pytorch pointer is more difficult (numba api is one way).
+        # Therefore launch a pointwise CUDA kernel to update the costs inplace from data of
+        # llForward.
         # Then negate to compute the loglikelihood.
         threadsperblock = min(costs.shape[0], 32)
         blockspergrid = (costs.shape[0] + (threadsperblock - 1)) // threadsperblock
@@ -254,7 +267,8 @@ class GPURNNT:
         Helper method that uses the workspace and constructs slices of it that can be used.
 
         Returns:
-            An int, representing the offset of the used workspace (practically, the slice of the workspace consumed)
+            An int, representing the offset of the used workspace (practically, the slice of
+            the workspace consumed)
             A tuple of tensors representing the shared workspace.
         """
         used_offset = 0

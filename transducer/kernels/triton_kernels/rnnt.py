@@ -3,19 +3,59 @@ from __future__ import annotations
 from typing import Tuple
 
 import torch
-import triton
-import triton.language as tl
+
+try:
+    import triton
+    import triton.language as tl
+except Exception:
+    triton = None
+    tl = None
+
+
+def _missing_triton(*_args, **_kwargs):
+    raise ImportError("Triton is not available. Install triton to use triton kernels.")
+
+
+if triton is None:
+
+    class _TritonKernelStub:
+        def __init__(self, _fn=None):
+            self._fn = _fn
+
+        def __call__(self, *_args, **_kwargs):
+            _missing_triton()
+
+        def __getitem__(self, _grid):
+            def launcher(*_args, **_kwargs):
+                _missing_triton()
+
+            return launcher
+
+    def triton_jit(*jit_args, **jit_kwargs):
+        def decorator(_fn):
+            return _TritonKernelStub(_fn)
+
+        if jit_args and callable(jit_args[0]) and not jit_kwargs:
+            return decorator(jit_args[0])
+        return decorator
+
+    def triton_cdiv(*_args, **_kwargs):
+        _missing_triton()
+else:
+    triton_jit = triton.jit
+    triton_cdiv = triton.cdiv
 
 
 NEG_INF = -1.0e30
 
-@triton.jit
+
+@triton_jit
 def _logsumexp_pair(a, b):
     m = tl.maximum(a, b)
     return m + tl.log(tl.exp(a - m) + tl.exp(b - m))
 
 
-@triton.jit
+@triton_jit
 def _rnnt_alpha_kernel(
     log_probs_ptr,
     labels_ptr,
@@ -49,7 +89,9 @@ def _rnnt_alpha_kernel(
                 if u == 0:
                     if t > 0:
                         prev = tl.load(
-                            alpha_base + (t - 1) * maxU + 0, mask=in_range, other=neg_inf
+                            alpha_base + (t - 1) * maxU + 0,
+                            mask=in_range,
+                            other=neg_inf,
                         )
                         logp = tl.load(
                             logp_base + ((t - 1) * maxU + 0) * V + blank_id,
@@ -114,7 +156,7 @@ def _rnnt_alpha_kernel(
     tl.store(loglikes_ptr + b, loglike, mask=in_bounds)
 
 
-@triton.jit
+@triton_jit
 def _rnnt_beta_kernel(
     log_probs_ptr,
     labels_ptr,
@@ -195,7 +237,7 @@ def _rnnt_beta_kernel(
             tl.store(beta_base + t * maxU + u, val, mask=in_range)
 
 
-@triton.jit
+@triton_jit
 def _rnnt_grad_kernel(
     log_probs_ptr,
     alphas_ptr,
@@ -332,7 +374,9 @@ def _launch_alphas(
     blank_id: int,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     B, maxT, maxU, V = log_probs.shape
-    alphas = torch.full((B, maxT, maxU), NEG_INF, device=log_probs.device, dtype=log_probs.dtype)
+    alphas = torch.full(
+        (B, maxT, maxU), NEG_INF, device=log_probs.device, dtype=log_probs.dtype
+    )
     loglikes = torch.empty((B,), device=log_probs.device, dtype=log_probs.dtype)
     label_stride = labels.shape[1]
     _rnnt_alpha_kernel[(B,)](
@@ -360,7 +404,9 @@ def _launch_betas(
     blank_id: int,
 ) -> torch.Tensor:
     B, maxT, maxU, V = log_probs.shape
-    betas = torch.full((B, maxT, maxU), NEG_INF, device=log_probs.device, dtype=log_probs.dtype)
+    betas = torch.full(
+        (B, maxT, maxU), NEG_INF, device=log_probs.device, dtype=log_probs.dtype
+    )
     label_stride = labels.shape[1]
     _rnnt_beta_kernel[(B,)](
         log_probs,
@@ -394,7 +440,7 @@ def _launch_grads(
     B, maxT, maxU, V = log_probs.shape
     grads = torch.zeros_like(log_probs)
     # Put the largest dimension on grid.x to avoid the 65k grid.y limit.
-    grid = (maxT * maxU, B, triton.cdiv(V, block_v))
+    grid = (maxT * maxU, B, triton_cdiv(V, block_v))
     label_stride = labels.shape[1]
     _rnnt_grad_kernel[grid](
         log_probs,
@@ -426,6 +472,10 @@ def rnnt_loss_triton(
     fastemit_lambda: float,
     clamp: float,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    if triton is None:
+        raise ImportError(
+            "Triton is not available. Install triton to use triton kernels."
+        )
     if acts.device.type != "cuda":
         raise RuntimeError("Triton RNNT only supports CUDA tensors.")
     if acts.dtype != torch.float32:

@@ -12,10 +12,12 @@ class TDTLossPytorch(Loss):
     def __init__(
         self,
         blank_id: int,
-        durations: List[int] = [],
+        durations: List[int] = None,
         reduction: Literal["mean", "sum", "none"] = "sum",
         sigma: float = 0.0,
     ):
+        if durations is None:
+            durations = []
         super().__init__()
 
         self.blank = blank_id
@@ -28,7 +30,9 @@ class TDTLossPytorch(Loss):
 
         self.sigma = sigma
 
-    def forward(self, acts: Tensor, labels: Tensor, act_lens: Tensor, label_lens: Tensor):
+    def forward(
+        self, acts: Tensor, labels: Tensor, act_lens: Tensor, label_lens: Tensor
+    ):
         label_acts = acts[:, :, :, : -self.n_durations]
 
         duration_acts = acts[:, :, :, -self.n_durations :]
@@ -77,12 +81,12 @@ class TDTLossPytorch(Loss):
                         else:
                             log_alpha[b, t, u] = -1000.0
 
-                            for n, l in enumerate(self.durations):
-                                if t - l >= 0 and l > 0:
+                            for n, duration in enumerate(self.durations):
+                                if t - duration >= 0 and duration > 0:
                                     tmp = (
-                                        log_alpha[b, t - l, u]
-                                        + acts[b, t - l, u, self.blank]
-                                        + duration_acts[b, t - l, u, n]
+                                        log_alpha[b, t - duration, u]
+                                        + acts[b, t - duration, u, self.blank]
+                                        + duration_acts[b, t - duration, u, n]
                                     )
 
                                     log_alpha[b, t, u] = self.logsumexp(
@@ -92,13 +96,13 @@ class TDTLossPytorch(Loss):
                     else:
                         log_alpha[b, t, u] = -1000.0
 
-                        for n, l in enumerate(self.durations):
-                            if t - l >= 0:
-                                if l > 0:
+                        for n, duration in enumerate(self.durations):
+                            if t - duration >= 0:
+                                if duration > 0:
                                     tmp = (
-                                        log_alpha[b, t - l, u]
-                                        + acts[b, t - l, u, self.blank]
-                                        + duration_acts[b, t - l, u, n]
+                                        log_alpha[b, t - duration, u]
+                                        + acts[b, t - duration, u, self.blank]
+                                        + duration_acts[b, t - duration, u, n]
                                     )
 
                                     log_alpha[b, t, u] = self.logsumexp(
@@ -106,24 +110,26 @@ class TDTLossPytorch(Loss):
                                     )
 
                                 tmp = (
-                                    log_alpha[b, t - l, u - 1]
-                                    + acts[b, t - l, u - 1, labels[b, u - 1]]
-                                    + duration_acts[b, t - l, u - 1, n]
+                                    log_alpha[b, t - duration, u - 1]
+                                    + acts[b, t - duration, u - 1, labels[b, u - 1]]
+                                    + duration_acts[b, t - duration, u - 1, n]
                                 )
 
-                                log_alpha[b, t, u] = self.logsumexp(tmp, 1.0 * log_alpha[b, t, u])
+                                log_alpha[b, t, u] = self.logsumexp(
+                                    tmp, 1.0 * log_alpha[b, t, u]
+                                )
 
         log_probs = []
 
         for b in range(B):
             tt = torch.Tensor([-1000.0])[0]
 
-            for n, l in enumerate(self.durations):
-                if act_lens[b] - l >= 0 and l > 0:
+            for n, duration in enumerate(self.durations):
+                if act_lens[b] - duration >= 0 and duration > 0:
                     bb = (
-                        log_alpha[b, act_lens[b] - l, label_lens[b]]
-                        + acts[b, act_lens[b] - l, label_lens[b], self.blank]
-                        + duration_acts[b, act_lens[b] - l, label_lens[b], n]
+                        log_alpha[b, act_lens[b] - duration, label_lens[b]]
+                        + acts[b, act_lens[b] - duration, label_lens[b], self.blank]
+                        + duration_acts[b, act_lens[b] - duration, label_lens[b], n]
                     )
 
                     tt = self.logsumexp(bb, 1.0 * tt)

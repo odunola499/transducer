@@ -1,7 +1,7 @@
 import torch
+from models.encoder import wav2vec2bert
 
 from transducer.models.config import Wav2Vec2BertConfig
-from models.encoder import wav2vec2bert
 
 
 def test_feature_projection_shapes():

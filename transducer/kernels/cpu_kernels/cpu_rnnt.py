@@ -28,10 +28,12 @@ def log_sum_exp(a: torch.Tensor, b: torch.Tensor):
 
 
 class CpuRNNT_index:
-    def __init__(self, U: int, maxU: int, minibatch: int, alphabet_size: int, batch_first: bool):
+    def __init__(
+        self, U: int, maxU: int, minibatch: int, alphabet_size: int, batch_first: bool
+    ):
         """
         A placeholder Index computation class that emits the resolved index in a flattened tensor,
-        mimicing pointer indexing in CUDA kernels on the CPU.
+        mimicking pointer indexing in CUDA kernels on the CPU.
 
         Args:
             U: Length of the current target sample (without padding).
@@ -78,7 +80,8 @@ class CpuRNNT_metadata:
             T: Length of the acoustic sequence (without padding).
             U: Length of the target sequence (without padding).
             workspace: Working space memory for the CPU.
-            bytes_used: Number of bytes currently used for indexing the working space memory. Generally 0.
+            bytes_used: Number of bytes currently used for indexing the working space memory.
+                Generally 0.
             blank: Index of the blank token in the vocabulary.
             labels: Ground truth padded labels matrix of shape [B, U]
             log_probs: Log probs / activation matrix of flattented shape [B, T, U, V+1]
@@ -114,8 +117,8 @@ class CpuRNNT_metadata:
         for t in range(T):
             for u in range(U):
                 offset = (
-                    t * U + u
-                ) * 2  # mult with 2 is for selecting either blank or label token. Odd idx is blank.
+                    (t * U + u) * 2
+                )  # mult with 2 is for selecting either blank or label token. Odd idx is blank.
                 self.log_probs2[offset] = log_probs[idx(t, u, blank)]
                 # // labels do not have first blank
                 if u < U - 1:
@@ -164,15 +167,18 @@ class CPURNNT:
 
         Args:
             minibatch: Size of the minibatch b.
-            maxT: The maximum possible acoustic sequence length. Represents T in the logprobs tensor.
+            maxT: The maximum possible acoustic sequence length. Represents T in the logprobs
+                tensor.
             maxU: The maximum possible target sequence length. Represents U in the logprobs tensor.
             alphabet_size: The vocabulary dimension V+1 (inclusive of RNNT blank).
-            workspace: An allocated chunk of memory that will be sliced off and reshaped into required
-                blocks used as working memory.
-            blank: Index of the RNNT blank token in the vocabulary. Generally the first or last token in the vocab.
+            workspace: An allocated chunk of memory that will be sliced off and reshaped into
+                required blocks used as working memory.
+            blank: Index of the RNNT blank token in the vocabulary. Generally the first or last
+                token in the vocab.
             fastemit_lambda: Float scaling factor for FastEmit regularization. Refer to
                 FastEmit: Low-latency Streaming ASR with Sequence-level Emission Regularization.
-            clamp: Float value. When set to value >= 0.0, will clamp the gradient to [-clamp, clamp].
+            clamp: Float value. When set to value >= 0.0, will clamp the gradient to
+                [-clamp, clamp].
             num_threads: Number of OMP threads to launch.
             batch_first: Bool that decides if batch dimension is first or third.
         """
@@ -180,9 +186,7 @@ class CPURNNT:
         self.maxT_ = maxT
         self.maxU_ = maxU
         self.alphabet_size_ = alphabet_size
-        self.workspace = (
-            workspace  # a flat vector of floatX numbers that represents allocated memory slices
-        )
+        self.workspace = workspace  # a flat vector of floatX numbers that represents allocated memory slices
         self.blank_ = blank
         self.fastemit_lambda_ = fastemit_lambda
         self.clamp_ = abs(clamp)
@@ -207,7 +211,9 @@ class CPURNNT:
         U: int,
         bytes_used: int,
     ):
-        idx = CpuRNNT_index(U, self.maxU_, self.minibatch_, self.alphabet_size_, self.batch_first)
+        idx = CpuRNNT_index(
+            U, self.maxU_, self.minibatch_, self.alphabet_size_, self.batch_first
+        )
         rnntm = CpuRNNT_metadata(
             T, U, self.workspace, bytes_used, self.blank_, labels, log_probs, idx
         )
@@ -231,7 +237,9 @@ class CPURNNT:
 
         return -llForward
 
-    def compute_alphas(self, log_probs: torch.Tensor, T: int, U: int, alphas: torch.Tensor):
+    def compute_alphas(
+        self, log_probs: torch.Tensor, T: int, U: int, alphas: torch.Tensor
+    ):
         """
         Compute the probability of the forward variable alpha.
 
@@ -244,16 +252,22 @@ class CPURNNT:
         Returns:
             Loglikelihood of the forward variable alpha.
         """
-        idx = CpuRNNT_index(U, self.maxU_, self.minibatch_, self.alphabet_size_, self.batch_first)
+        idx = CpuRNNT_index(
+            U, self.maxU_, self.minibatch_, self.alphabet_size_, self.batch_first
+        )
 
         alphas[0] = 0
         for t in range(T):
             for u in range(U):
                 if u == 0 and t > 0:
-                    alphas[idx(t, 0)] = alphas[idx(t - 1, 0)] + log_probs[idx(t - 1, 0) * 2]
+                    alphas[idx(t, 0)] = (
+                        alphas[idx(t - 1, 0)] + log_probs[idx(t - 1, 0) * 2]
+                    )
 
                 if t == 0 and u > 0:
-                    alphas[idx(0, u)] = alphas[idx(0, u - 1)] + log_probs[idx(0, u - 1) * 2 + 1]
+                    alphas[idx(0, u)] = (
+                        alphas[idx(0, u - 1)] + log_probs[idx(0, u - 1) * 2 + 1]
+                    )
 
                 if t > 0 and u > 0:
                     no_emit = alphas[idx(t - 1, u)] + log_probs[idx(t - 1, u) * 2]
@@ -275,8 +289,8 @@ class CPURNNT:
         logll: torch.Tensor,
     ):
         """
-        Compute backward variable beta as well as gradients of the activation matrix wrt loglikelihood
-        of forward variable.
+        Compute backward variable beta as well as gradients of the activation matrix wrt
+        loglikelihood of forward variable.
 
         Args:
             grad: Working space memory of flattened shape [B, T, U, V+1]
@@ -295,13 +309,17 @@ class CPURNNT:
         if log_probs.dtype == torch.float16 and not log_probs.is_cuda:
             log_probs = log_probs.float()
 
-        idx = CpuRNNT_index(U, self.maxU_, self.minibatch_, self.alphabet_size_, self.batch_first)
+        idx = CpuRNNT_index(
+            U, self.maxU_, self.minibatch_, self.alphabet_size_, self.batch_first
+        )
         betas[idx(T - 1, U - 1)] = log_probs[idx(T - 1, U - 1) * 2]
 
         for t in range(T - 1, -1, -1):
             for u in range(U - 1, -1, -1):
                 if (u == U - 1) and (t < T - 1):
-                    betas[idx(t, U - 1)] = betas[idx(t + 1, U - 1)] + log_probs[idx(t, U - 1) * 2]
+                    betas[idx(t, U - 1)] = (
+                        betas[idx(t + 1, U - 1)] + log_probs[idx(t, U - 1) * 2]
+                    )
 
                 if (t == T - 1) and (u < U - 1):
                     betas[idx(T - 1, u)] = (

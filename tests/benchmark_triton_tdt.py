@@ -38,7 +38,9 @@ def _make_training_like_data(
     device = torch.device("cuda")
     blank_id = vocab - 1
     max_label_len = (max_u - 1) if max_label_len is None else max_label_len
-    label_lens = torch.randint(1, max_label_len + 1, (batch,), device=device, dtype=torch.long)
+    label_lens = torch.randint(
+        1, max_label_len + 1, (batch,), device=device, dtype=torch.long
+    )
     if force_max_label:
         label_lens[0] = max_label_len
 
@@ -77,7 +79,9 @@ def _tensor_stats(tensor):
     }
 
 
-def _print_nonfinite_debug(tag, acts, labels, act_lens, label_lens, blank_id, num_durations):
+def _print_nonfinite_debug(
+    tag, acts, labels, act_lens, label_lens, blank_id, num_durations
+):
     batch, max_t, max_u, total_vocab = acts.shape
     vocab = total_vocab - num_durations
     act_lens_use = (
@@ -166,7 +170,9 @@ def _compare_data(
     acts_cuda = acts.clone().requires_grad_(True)
     acts_triton = acts.clone().requires_grad_(True)
 
-    loss_val_cuda = loss_cuda(acts_cuda, labels, act_lens=act_lens, label_lens=label_lens)
+    loss_val_cuda = loss_cuda(
+        acts_cuda, labels, act_lens=act_lens, label_lens=label_lens
+    )
     loss_val_triton = loss_triton(
         acts_triton, labels, act_lens=act_lens, label_lens=label_lens
     )
@@ -181,7 +187,12 @@ def _compare_data(
     triton_loss_finite = torch.isfinite(loss_val_triton).all().item()
     cuda_grad_finite = torch.isfinite(acts_cuda.grad).all().item()
     triton_grad_finite = torch.isfinite(acts_triton.grad).all().item()
-    if not (cuda_loss_finite and triton_loss_finite and cuda_grad_finite and triton_grad_finite):
+    if not (
+        cuda_loss_finite
+        and triton_loss_finite
+        and cuda_grad_finite
+        and triton_grad_finite
+    ):
         _print_nonfinite_debug(
             "non_finite",
             acts,
@@ -294,7 +305,10 @@ def _finite_diff_check(
         num_grad = (loss_plus - loss_minus) / (2.0 * eps)
         auto_grad = grads[b, t, u, v].item()
 
-        if not (torch.isfinite(torch.tensor(num_grad)) and torch.isfinite(torch.tensor(auto_grad))):
+        if not (
+            torch.isfinite(torch.tensor(num_grad))
+            and torch.isfinite(torch.tensor(auto_grad))
+        ):
             nonfinite += 1
             continue
 
@@ -353,7 +367,7 @@ def _benchmark(loss_fn, acts, labels, act_lens, label_lens, iters=20):
 
 
 def _format_mem(value_bytes):
-    return f"{value_bytes / (1024 ** 2):.1f}MiB"
+    return f"{value_bytes / (1024**2):.1f}MiB"
 
 
 def main():
@@ -436,7 +450,9 @@ def main():
             sigma=sigma,
             omega=omega,
         )
-        parity = _autograd_parity(acts, labels, act_lens, label_lens, loss_ref, loss_new)
+        parity = _autograd_parity(
+            acts, labels, act_lens, label_lens, loss_ref, loss_new
+        )
         fd_abs, fd_rel, fd_sign, fd_nonfinite = _finite_diff_check(
             loss_new,
             acts,
@@ -487,7 +503,16 @@ def main():
         )
 
     print("\nTDT Triton vs CUDA correctness (train-like padding)")
-    for name, batch, max_t, max_u, vocab, force_max_label, max_label_len, allow_zero_tokens in train_like_cases:
+    for (
+        name,
+        batch,
+        max_t,
+        max_u,
+        vocab,
+        force_max_label,
+        max_label_len,
+        allow_zero_tokens,
+    ) in train_like_cases:
         acts, labels, act_lens, label_lens = _make_training_like_data(
             batch,
             max_t,
@@ -596,7 +621,9 @@ def main():
         _warmup(loss_triton, acts, labels, act_lens, label_lens, iters=warmup_iters)
         cuda_mem = _measure_memory(loss_cuda, acts, labels, act_lens, label_lens)
         triton_mem = _measure_memory(loss_triton, acts, labels, act_lens, label_lens)
-        cuda_ms = _benchmark(loss_cuda, acts, labels, act_lens, label_lens, iters=timed_iters)
+        cuda_ms = _benchmark(
+            loss_cuda, acts, labels, act_lens, label_lens, iters=timed_iters
+        )
         triton_ms = _benchmark(
             loss_triton, acts, labels, act_lens, label_lens, iters=timed_iters
         )
@@ -612,7 +639,16 @@ def main():
         )
 
     print("\nTDT Triton vs CUDA speed (train-like padding)")
-    for name, batch, max_t, max_u, vocab, force_max_label, max_label_len, allow_zero_tokens in train_like_cases:
+    for (
+        name,
+        batch,
+        max_t,
+        max_u,
+        vocab,
+        force_max_label,
+        max_label_len,
+        allow_zero_tokens,
+    ) in train_like_cases:
         acts, labels, act_lens, label_lens = _make_training_like_data(
             batch,
             max_t,
@@ -647,7 +683,9 @@ def main():
         _warmup(loss_triton, acts, labels, act_lens, label_lens, iters=warmup_iters)
         cuda_mem = _measure_memory(loss_cuda, acts, labels, act_lens, label_lens)
         triton_mem = _measure_memory(loss_triton, acts, labels, act_lens, label_lens)
-        cuda_ms = _benchmark(loss_cuda, acts, labels, act_lens, label_lens, iters=timed_iters)
+        cuda_ms = _benchmark(
+            loss_cuda, acts, labels, act_lens, label_lens, iters=timed_iters
+        )
         triton_ms = _benchmark(
             loss_triton, acts, labels, act_lens, label_lens, iters=timed_iters
         )
