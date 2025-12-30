@@ -130,6 +130,17 @@ class DecoderConfig(Args):
     vocab_size: StrictInt = 1024
 
 
+class ParakeetDecoderConfig(DecoderConfig):
+    rnn_type: Literal["gru", "lstm"] = "lstm"
+    embed_dim: StrictInt = 512
+    hidden_dim: StrictInt = 512
+    pred_dim: StrictInt = 640
+    joint_dim: StrictInt = 640
+    num_layers: StrictInt = 1
+    dropout: StrictFloat = 0.2
+    vocab_size: StrictInt = 1024
+
+
 class ModelConfig(Args):
     model_name: StrictStr  # Used for logging etc
     loss_type: Literal["tdt", "tdt_triton", "rnnt", "rnnt_triton"] = "rnnt"
@@ -139,5 +150,10 @@ class ModelConfig(Args):
     blank_id: Optional[StrictInt] = None
     loss_reduction: Literal["sum", "mean"] = "sum"
     sampler_type: Literal["greedy_search", "beam_search"] = "greedy_search"
-    encoder_config: Wav2VecSmallConfig | Wav2VecLargeConfig | Wav2Vec2BertConfig
-    decoder_config: DecoderConfig
+    encoder_config: (
+        Wav2VecSmallConfig
+        | Wav2VecLargeConfig
+        | Wav2Vec2BertConfig
+        | FastConformerConfig
+    )
+    decoder_config: DecoderConfig | ParakeetDecoderConfig

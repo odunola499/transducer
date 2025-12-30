@@ -9,11 +9,12 @@ from torch.utils.data import Dataset, IterableDataset, get_worker_info
 from transformers import AutoFeatureExtractor
 
 from transducer.dataset.config import DatasetConfig
-from transducer.processor import Processor, Tokenizer
+from transducer.processor import Processor, Tokenizer, NemoFeatureExtractor
 
 FEATURE_EXTRACTORS = {
     "wav2vec2": AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-base"),
     "wav2vecbert": AutoFeatureExtractor.from_pretrained("facebook/w2v-bert-2.0"),
+    "parakeet": NemoFeatureExtractor(),
 }
 
 

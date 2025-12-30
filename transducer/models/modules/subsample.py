@@ -18,13 +18,18 @@ def calc_length(lengths, all_paddings, kernel_size, stride, ceil_mode, repeat_nu
             lengths = torch.floor(lengths)
     return lengths.to(dtype=torch.int)
 
+
 def apply_channel_mask(tensor, mask):
     batch_size, channels, time, features = tensor.shape
     expanded_mask = mask.unsqueeze(1).expand(batch_size, channels, time, features)
     return tensor * expanded_mask
 
-def calculate_conv_output_size(input_size: torch.Tensor, kernel_size: int, stride: int, padding: tuple[int, int]):
+
+def calculate_conv_output_size(
+    input_size: torch.Tensor, kernel_size: int, stride: int, padding: tuple[int, int]
+):
     return (input_size + padding[0] + padding[1] - kernel_size) // stride + 1
+
 
 class MaskedConvSequential(nn.Sequential):
     def forward(self, x, lengths):
@@ -36,7 +41,7 @@ class MaskedConvSequential(nn.Sequential):
             x = apply_channel_mask(x, mask)
 
             x = layer(x)
-            if hasattr(layer, 'stride') and layer.stride != (1, 1):
+            if hasattr(layer, "stride") and layer.stride != (1, 1):
                 if hasattr(layer, "_left_padding"):
                     padding = (layer._left_padding, layer._right_padding)
                 else:
@@ -51,8 +56,13 @@ class MaskedConvSequential(nn.Sequential):
 
     def _create_mask(self, tensor, lengths):
         batch_size, channels, time, features = tensor.shape
-        time_mask = torch.arange(time, device=tensor.device).expand(batch_size, time) < lengths.unsqueeze(1)
-        return time_mask.unsqueeze(-1).expand(batch_size, time, features).to(tensor.dtype)
+        time_mask = torch.arange(time, device=tensor.device).expand(
+            batch_size, time
+        ) < lengths.unsqueeze(1)
+        return (
+            time_mask.unsqueeze(-1).expand(batch_size, time, features).to(tensor.dtype)
+        )
+
 
 class ConvSubsampling(nn.Module):
     def __init__(
@@ -136,7 +146,6 @@ class ConvSubsampling(nn.Module):
         self.conv = MaskedConvSequential(*layers)
 
     def forward(self, x: Tensor, lengths: Tensor):
-
         x_ceil = 2**31 / self._conv_channels * self._stride * self._stride
         if torch.numel(x) > x_ceil:
             x, lengths, success = self.conv_split_by_batch(x, lengths)

@@ -17,7 +17,6 @@ class DawnModel(BaseModel, GenerationMixin):
     def __init__(self, vocab_size: int, config: ModelConfig):
         super().__init__(config)
         self.model_name = config.model_name
-        # Place blank token at the end of the vocabulary space
         base_vocab_size = config.decoder_config.vocab_size
         self.blank_id = base_vocab_size if config.blank_id is None else config.blank_id
         if self.blank_id != base_vocab_size:
@@ -41,7 +40,6 @@ class DawnModel(BaseModel, GenerationMixin):
         encoder_config = config.encoder_config
         decoder_config = config.decoder_config
 
-        # Select encoder based on provided config class
         if isinstance(encoder_config, Wav2Vec2BertConfig):
             self.encoder = Wav2Vec2BertModel(encoder_config)
         elif isinstance(encoder_config, Wav2VecConfig):

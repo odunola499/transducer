@@ -12,11 +12,9 @@ class BaseModel(nn.Module, ABC):
         super().__init__()
         self.config = config
 
-    @abstractmethod
     def compute_loss(
         self, lattice: Tensor, labels: Tensor, act_lens: Tensor, label_lens: Tensor
-    ):
-        raise NotImplementedError
+    ): ...
 
     @abstractmethod
     def forward(

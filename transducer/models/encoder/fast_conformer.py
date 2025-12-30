@@ -138,10 +138,9 @@ class ConformerEncoder(nn.Module):
 
         pad_mask = None
         if length is not None:
-            max_len = x.size(1)
             pad_mask = torch.arange(0, x.shape[1], device=x.device).expand(
-            length.size(0), -1
-        ) < length.unsqueeze(-1)
+                length.size(0), -1
+            ) < length.unsqueeze(-1)
             pad_mask = ~pad_mask
 
         for layer in self.layers:

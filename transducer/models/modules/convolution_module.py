@@ -20,7 +20,6 @@ class CausalConv1d(nn.Conv1d):
         device=None,
         dtype=None,
     ):
-        
         if padding is None:
             self._left_padding = kernel_size - 1
             self._right_padding = stride - 1
@@ -130,11 +129,13 @@ class CausalConv2D(nn.Conv2d):
 
 
 class ConformerConvolution(nn.Module):
-    def __init__(self, hidden_size, kernel_size, norm_type = 'layer_norm',use_bias=False):
+    def __init__(
+        self, hidden_size, kernel_size, norm_type="layer_norm", use_bias=False
+    ):
         super().__init__()
         self.d_model = hidden_size
         self.kernel_size = kernel_size
-        conv_context_size = [kernel_size - 1,0]
+        conv_context_size = [kernel_size - 1, 0]
 
         self.pointwise_conv1 = nn.Conv1d(
             in_channels=hidden_size,
@@ -155,9 +156,9 @@ class ConformerConvolution(nn.Module):
             bias=use_bias,
         )
 
-        if norm_type == 'layer_norm':
+        if norm_type == "layer_norm":
             self.batch_norm = nn.LayerNorm(hidden_size)
-        elif norm_type == 'batch_norm':
+        elif norm_type == "batch_norm":
             self.batch_norm = nn.BatchNorm1d(hidden_size)
         self.norm_type = norm_type
 
@@ -174,13 +175,13 @@ class ConformerConvolution(nn.Module):
     def forward(self, x, pad_mask=None, cache=None):
         x = x.transpose(1, 2)
         x = self.pointwise_conv1(x)
-        x = F.glu(x, dim = 1)
+        x = F.glu(x, dim=1)
 
         if pad_mask is not None:
             x = x.masked_fill(pad_mask.unsqueeze(1), 0.0)
 
         x = self.depthwise_conv(x, cache=cache)
-        if self.norm_type == 'layer_norm':
+        if self.norm_type == "layer_norm":
             x = self.batch_norm(x.transpose(1, 2)).transpose(1, 2)
         else:
             x = self.batch_norm(x)

@@ -36,8 +36,8 @@ def eager_attention_forward(
     value: torch.Tensor,
     attention_mask: Optional[torch.Tensor],
     scaling: Optional[float] = None,
-    dropout: float = 0.0
-):  
+    dropout: float = 0.0,
+):
     attn_weights = torch.matmul(query, key.transpose(2, 3)) * scaling
     if attention_mask is not None:
         mask = attention_mask[:, :, :, : key.shape[-2]]
@@ -109,7 +109,7 @@ class PositionalEncoding(nn.Module):
         dropout=0.1,
         max_len: int = 5000,
         dropout_rate_emb: float = 0.0,
-        xscale:bool = False
+        xscale: bool = False,
     ):
         super().__init__()
         self.d_model = hidden_size
@@ -157,7 +157,12 @@ class PositionalEncoding(nn.Module):
 
 class FastConformerAttention(nn.Module):
     def __init__(
-        self, num_heads, hidden_size: int, dropout: float, use_bias: bool = True, attn_impl = 'eager'
+        self,
+        num_heads,
+        hidden_size: int,
+        dropout: float,
+        use_bias: bool = True,
+        attn_impl="eager",
     ):
         super().__init__()
         self.d_k = hidden_size // num_heads
@@ -208,25 +213,24 @@ class FastConformerAttention(nn.Module):
         scale_factor = 1 / math.sqrt(q_with_bias_u.size(-1))
         matrix_bd = matrix_bd[:, :, :, : key.size(-2)] * scale_factor
 
-        if self.attn_impl == 'eager':
-
+        if self.attn_impl == "eager":
             output, _ = eager_attention_forward(
                 self,
                 query=q_with_bias_u,
                 key=key,
                 value=value,
                 attention_mask=matrix_bd,
-                scaling=1/self.s_d_k,
+                scaling=1 / self.s_d_k,
                 dropout=self.dropout if self.training else 0.0,
             )
         else:
             output = sdpa_attention_forward(
                 self,
-                query = q_with_bias_u,
-                key = key,
-                value = value,
-                attention_mask = matrix_bd,
-                scaling = None,
+                query=q_with_bias_u,
+                key=key,
+                value=value,
+                attention_mask=matrix_bd,
+                scaling=None,
                 dropout=self.dropout if self.training else 0.0,
             )
 

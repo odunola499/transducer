@@ -48,7 +48,7 @@ def main():
 
     config = FastConformerConfig()
     conf_encoder = ConformerEncoder(config=config).eval().to(device)
-    conf_encoder.load_state_dict(encoder.state_dict(), strict = True)
+    conf_encoder.load_state_dict(encoder.state_dict(), strict=True)
     print("conf_encoder params", print_params(conf_encoder))
 
     with torch.no_grad():
@@ -75,11 +75,9 @@ def main():
     conf_lengths = feature_lengths.clone()
 
     nemo_sub_out, nemo_lengths = nemo_pre_encode(
-        x = features.transpose(1, 2), lengths = nemo_lengths
+        x=features.transpose(1, 2), lengths=nemo_lengths
     )
-    conf_sub_out, conf_lengths = conf_pre_encode(
-        features.transpose(1, 2), conf_lengths
-    )
+    conf_sub_out, conf_lengths = conf_pre_encode(features.transpose(1, 2), conf_lengths)
     compare_tensors("pre_encode_out", nemo_sub_out, conf_sub_out, "nemo", "conf")
     compare_tensors("pre_encode_len", nemo_lengths, conf_lengths, "nemo", "conf")
 
@@ -111,17 +109,19 @@ def main():
     ):
         nemo_x = nemo_layer(x=nemo_x, pos_emb=nemo_pos_emb, pad_mask=nemo_pad_mask)
         conf_x = conf_layer(x=conf_x, pos_emb=conf_pos_emb, pad_mask=conf_pad_mask)
-        compare_tensors(
-            f"layer_{idx}_output", nemo_x, conf_x, "nemo", "conf"
-        )
+        compare_tensors(f"layer_{idx}_output", nemo_x, conf_x, "nemo", "conf")
 
     compare_tensors(
         "final_encoder_outputs", encoder_outputs, conf_encoder_outputs, "nemo", "conf"
     )
 
     with torch.no_grad():
-        nemo_out, nemo_len = encoder(audio_signal = features, length = feature_lengths.clone())
-        conf_out, conf_len = conf_encoder(features, length=feature_lengths.clone(), return_lengths=True)
+        nemo_out, nemo_len = encoder(
+            audio_signal=features, length=feature_lengths.clone()
+        )
+        conf_out, conf_len = conf_encoder(
+            features, length=feature_lengths.clone(), return_lengths=True
+        )
 
     diff = (nemo_out - conf_out).abs()
     max_total = diff.max()
@@ -130,9 +130,10 @@ def main():
         .unsqueeze(0)
         .expand(conf_len.size(0), -1)
     ) < conf_len.unsqueeze(1)  # True where frames are valid
-    max_valid = diff.permute(0,2,1)[mask_valid].max()  # permute to (B,T,C) to mask over T
+    max_valid = diff.permute(0, 2, 1)[
+        mask_valid
+    ].max()  # permute to (B,T,C) to mask over T
     print(max_total, max_valid)
-
 
 
 if __name__ == "__main__":
