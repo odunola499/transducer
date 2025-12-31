@@ -2,7 +2,7 @@ import torch
 from torch import Tensor, nn
 
 from transducer import config
-from transducer.models.config import FastConformerConfig
+from transducer.models.config import FastConformerConfig, StreamingConfig
 from transducer.models.modules import (
     ConformerConvolution,
     ConvSubsampling,
@@ -22,6 +22,7 @@ class ConformerLayer(nn.Module):
         dropout_att: float,
         conv_kernel_size: int = 31,
         use_bias: bool = True,
+        attn_impl: str = "eager",
     ):
         super().__init__()
         self.d_model = hidden_size
@@ -50,6 +51,7 @@ class ConformerLayer(nn.Module):
             num_heads=num_heads,
             dropout=dropout_att,
             use_bias=use_bias,
+            attn_impl=attn_impl,
         )
         self.norm_feed_forward2 = nn.LayerNorm(hidden_size)
         self.feed_forward2 = FeedForward(
@@ -61,14 +63,14 @@ class ConformerLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm_out = nn.LayerNorm(hidden_size)
 
-    def forward(self, x, pos_emb=None, pad_mask=None, cache=None):
+    def forward(self, x, pos_emb=None, pad_mask=None, att_mask=None, cache=None):
         residual = x
         x = self.norm_feed_forward1(x)
         x = self.feed_forward1(x)
         residual += self.dropout(x) * 0.5
 
         x = self.norm_self_att(residual)
-        x = self.self_attn(x, pos_emb)
+        x = self.self_attn(x, pos_emb, att_mask=att_mask)
         residual += self.dropout(x)
 
         x = self.norm_conv(residual)
@@ -89,6 +91,7 @@ class ConformerEncoder(nn.Module):
     def __init__(self, config: FastConformerConfig):
         super().__init__()
         self.config = config
+        self.stream_config = StreamingConfig()
 
         d_ff = config.hidden_size * config.ff_expansion_factor
         self.d_model = config.hidden_size
@@ -112,6 +115,11 @@ class ConformerEncoder(nn.Module):
         )
 
         self.layers = nn.ModuleList()
+        attn_impl = config.attn_impl
+        if attn_impl == "math":
+            attn_impl = "eager"
+        elif attn_impl not in {"eager", "sdpa"}:
+            attn_impl = "eager"
         for _i in range(config.num_hidden_layers):
             layer = ConformerLayer(
                 hidden_size=config.hidden_size,
@@ -121,10 +129,12 @@ class ConformerEncoder(nn.Module):
                 dropout_att=config.dropout_att,
                 conv_kernel_size=config.conv_kernel_size,
                 use_bias=config.use_bias,
+                attn_impl=attn_impl,
             )
             self.layers.append(layer)
 
         self.att_context_size = config.att_context_size
+        self.att_context_style = config.att_context_style
 
     def forward(self, x, length: Tensor = None, return_lengths: bool = False):
         if length is None:
@@ -137,20 +147,76 @@ class ConformerEncoder(nn.Module):
         x, pos_emb = self.pos_enc(x=x)
 
         pad_mask = None
+        att_mask = None
         if length is not None:
-            pad_mask = torch.arange(0, x.shape[1], device=x.device).expand(
-                length.size(0), -1
-            ) < length.unsqueeze(-1)
-            pad_mask = ~pad_mask
+            pad_mask, att_mask = self._create_masks(
+                padding_length=length,
+                max_audio_length=x.shape[1],
+                device=x.device,
+            )
 
         for layer in self.layers:
-            x = layer(x=x, pos_emb=pos_emb, pad_mask=pad_mask)
+            x = layer(x=x, pos_emb=pos_emb, pad_mask=pad_mask, att_mask=att_mask)
 
         x = x.transpose(1, 2)
 
         if return_lengths:
             return x, length
         return x
+
+    def _normalize_att_context_size(self):
+        att_context_size = self.att_context_size
+        if isinstance(att_context_size, (list, tuple)) and len(att_context_size) > 0:
+            if isinstance(att_context_size[0], (list, tuple)):
+                att_context_size = att_context_size[0]
+        if not isinstance(att_context_size, (list, tuple)) or len(att_context_size) != 2:
+            att_context_size = [-1, -1]
+        return list(att_context_size)
+
+    def _create_masks(self, padding_length, max_audio_length, device):
+        att_context_size = self._normalize_att_context_size()
+        att_mask = torch.ones(
+            1, max_audio_length, max_audio_length, dtype=torch.bool, device=device
+        )
+        if self.att_context_style == "regular":
+            if att_context_size[0] >= 0:
+                att_mask = att_mask.triu(diagonal=-att_context_size[0])
+            if att_context_size[1] >= 0:
+                att_mask = att_mask.tril(diagonal=att_context_size[1])
+        elif self.att_context_style == "chunked_limited":
+            if att_context_size[1] == -1:
+                if att_context_size[0] >= 0:
+                    att_mask = att_mask.triu(diagonal=-att_context_size[0])
+            else:
+                chunk_size = att_context_size[1] + 1
+                left_chunks_num = (
+                    att_context_size[0] // chunk_size if att_context_size[0] >= 0 else 10000
+                )
+                chunk_idx = torch.arange(
+                    0, max_audio_length, dtype=torch.int, device=device
+                )
+                chunk_idx = torch.div(chunk_idx, chunk_size, rounding_mode="trunc")
+                diff_chunks = chunk_idx.unsqueeze(1) - chunk_idx.unsqueeze(0)
+                chunked_limited_mask = torch.logical_and(
+                    torch.le(diff_chunks, left_chunks_num), torch.ge(diff_chunks, 0)
+                )
+                att_mask = torch.logical_and(att_mask, chunked_limited_mask.unsqueeze(0))
+
+        pad_mask = torch.arange(0, max_audio_length, device=device).expand(
+            padding_length.size(0), -1
+        ) < padding_length.unsqueeze(-1)
+
+        pad_mask_for_att_mask = pad_mask.unsqueeze(1).repeat([1, max_audio_length, 1])
+        pad_mask_for_att_mask = torch.logical_and(
+            pad_mask_for_att_mask, pad_mask_for_att_mask.transpose(1, 2)
+        )
+        att_mask = torch.logical_and(
+            pad_mask_for_att_mask, att_mask.to(pad_mask_for_att_mask.device)
+        )
+        att_mask = ~att_mask
+
+        pad_mask = ~pad_mask
+        return pad_mask, att_mask
 
 
 if __name__ == "__main__":

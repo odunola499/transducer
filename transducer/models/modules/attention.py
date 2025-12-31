@@ -162,7 +162,7 @@ class FastConformerAttention(nn.Module):
         hidden_size: int,
         dropout: float,
         use_bias: bool = True,
-        attn_impl="eager",
+        attn_impl="sdpa",
     ):
         super().__init__()
         self.d_k = hidden_size // num_heads
@@ -185,7 +185,7 @@ class FastConformerAttention(nn.Module):
         x = x.view(B, H, -1, qlen)[:, :, 1:].view(B, H, qlen, pos_len)
         return x
 
-    def forward(self, x: Tensor, pos_emb: Tensor):
+    def forward(self, x: Tensor, pos_emb: Tensor, att_mask: Optional[Tensor] = None):
         """
         query (torch.Tensor): (batch, time1, size)
             key (torch.Tensor): (batch, time2, size)
@@ -210,21 +210,31 @@ class FastConformerAttention(nn.Module):
 
         matrix_bd = torch.matmul(q_with_bias_v, p.transpose(-2, -1))
         matrix_bd = self.rel_shift(matrix_bd)
-        scale_factor = 1 / math.sqrt(q_with_bias_u.size(-1))
-        matrix_bd = matrix_bd[:, :, :, : key.size(-2)] * scale_factor
+        matrix_bd = matrix_bd[:, :, :, : key.size(-2)]
+
+        if att_mask is not None:
+            if att_mask.dtype != torch.bool:
+                att_mask = att_mask.to(torch.bool)
+            if att_mask.dim() == 3:
+                att_mask = att_mask.unsqueeze(1)
+        mask_for_sdpa = att_mask
 
         if self.attn_impl == "eager":
-            output, _ = eager_attention_forward(
-                self,
-                query=q_with_bias_u,
-                key=key,
-                value=value,
-                attention_mask=matrix_bd,
-                scaling=1 / self.s_d_k,
-                dropout=self.dropout if self.training else 0.0,
-            )
+            matrix_ac = torch.matmul(q_with_bias_u, key.transpose(-2, -1))
+            scores = (matrix_ac + matrix_bd) / self.s_d_k
+            if att_mask is not None:
+                scores = scores.masked_fill(att_mask, -INF_VAL)
+            attn = torch.softmax(scores, dim=-1)
+            if att_mask is not None:
+                attn = attn.masked_fill(att_mask, 0.0)
+            attn = F.dropout(attn, p=self.dropout, training=self.training)
+            output = torch.matmul(attn, value)
+            output = output.transpose(1, 2).contiguous()
         else:
-            output = sdpa_attention_forward(
+            matrix_bd = matrix_bd * (1 / self.s_d_k)
+            if att_mask is not None:
+                matrix_bd = matrix_bd.masked_fill(att_mask, -INF_VAL)
+            output, _ = sdpa_attention_forward(
                 self,
                 query=q_with_bias_u,
                 key=key,
@@ -233,6 +243,13 @@ class FastConformerAttention(nn.Module):
                 scaling=None,
                 dropout=self.dropout if self.training else 0.0,
             )
+            if mask_for_sdpa is not None:
+                all_masked_rows = torch.all(mask_for_sdpa, dim=-1)
+                if all_masked_rows.dim() == 3:
+                    all_masked_rows = all_masked_rows.squeeze(1)
+                output = output.masked_fill(
+                    all_masked_rows.unsqueeze(-1).unsqueeze(-1), 0.0
+                )
 
         output = output.reshape(n_batch, -1, self.num_heads * self.d_k)
         return self.linear_out(output)

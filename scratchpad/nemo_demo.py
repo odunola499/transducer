@@ -47,6 +47,9 @@ def main():
     features, feature_lengths = asr_feature_extractor(audio, lengths.clone())
 
     config = FastConformerConfig()
+    config.att_context_size = encoder.att_context_size
+    config.att_context_style = encoder.att_context_style
+    config.attn_impl = "math"
     conf_encoder = ConformerEncoder(config=config).eval().to(device)
     conf_encoder.load_state_dict(encoder.state_dict(), strict=True)
     print("conf_encoder params", print_params(conf_encoder))
@@ -81,16 +84,18 @@ def main():
     compare_tensors("pre_encode_out", nemo_sub_out, conf_sub_out, "nemo", "conf")
     compare_tensors("pre_encode_len", nemo_lengths, conf_lengths, "nemo", "conf")
 
-    nemo_pad_mask = (
-        torch.arange(nemo_sub_out.size(1), device=device)
-        .unsqueeze(0)
-        .expand(nemo_lengths.size(0), -1)
-    ) >= nemo_lengths.unsqueeze(1)
-    conf_pad_mask = (
-        torch.arange(conf_sub_out.size(1), device=device)
-        .unsqueeze(0)
-        .expand(conf_lengths.size(0), -1)
-    ) >= conf_lengths.unsqueeze(1)
+    nemo_pad_mask, nemo_att_mask = encoder._create_masks(
+        att_context_size=encoder.att_context_size,
+        padding_length=nemo_lengths,
+        max_audio_length=nemo_sub_out.size(1),
+        offset=None,
+        device=device,
+    )
+    conf_pad_mask, conf_att_mask = conf_encoder._create_masks(
+        padding_length=conf_lengths,
+        max_audio_length=conf_sub_out.size(1),
+        device=device,
+    )
 
     nemo_pos = encoder.pos_enc
     conf_pos = conf_encoder.pos_enc
@@ -107,8 +112,12 @@ def main():
     for idx, (nemo_layer, conf_layer) in enumerate(
         zip(nemo_layers, conf_encoder.layers)
     ):
-        nemo_x = nemo_layer(x=nemo_x, pos_emb=nemo_pos_emb, pad_mask=nemo_pad_mask)
-        conf_x = conf_layer(x=conf_x, pos_emb=conf_pos_emb, pad_mask=conf_pad_mask)
+        nemo_x = nemo_layer(
+            x=nemo_x, pos_emb=nemo_pos_emb, pad_mask=nemo_pad_mask, att_mask=nemo_att_mask
+        )
+        conf_x = conf_layer(
+            x=conf_x, pos_emb=conf_pos_emb, pad_mask=conf_pad_mask, att_mask=conf_att_mask
+        )
         compare_tensors(f"layer_{idx}_output", nemo_x, conf_x, "nemo", "conf")
 
     compare_tensors(

@@ -17,8 +17,7 @@ class CausalConv1d(nn.Conv1d):
         groups: int = 1,
         bias: bool = True,
         padding_mode: str = "zeros",
-        device=None,
-        dtype=None,
+
     ):
         if padding is None:
             self._left_padding = kernel_size - 1

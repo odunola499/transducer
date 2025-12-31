@@ -7,7 +7,7 @@ import nemo.collections.asr as nemo_asr
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 asr_model = nemo_asr.models.EncDecRNNTBPEModel.from_pretrained(
-    model_name="nvidia/parakeet_realtime_eou_120m-v1"
+model_name="nvidia/parakeet_realtime_eou_120m-v1"
 ).to(device).eval()
 
 encoder = asr_model.encoder
@@ -21,8 +21,8 @@ print('init input',audio_signal.shape)
 print('init input',audio_lens)
 
 output_audio_signal, output_audio_lens = encoder.forward_internal(
-    audio_signal = audio_signal,
-    length = audio_lens
+audio_signal = audio_signal,
+length = audio_lens
 )
 print('final_output',output_audio_signal.shape)
 print('final_output_lens',output_audio_lens)
@@ -30,6 +30,7 @@ print('final_output_lens',output_audio_lens)
 
 curr_att_context_size = encoder.att_context_size
 att_context_style = encoder.att_context_style
+
 print('curr att context length',curr_att_context_size)
 print('attn context style',att_context_style)
 
@@ -38,15 +39,13 @@ pre_encode_output, pre_encode_lens = pre_encode(x = audio_signal.transpose(1,2),
 print(pre_encode_output.shape)
 print(pre_encode_lens)
 
-hparams = asr_model.hparams['cfg']
+max_audio_length = pre_encode_output.shape[1]
 
+print(encoder.streaming_cfg)
+print(encoder.export_cache_support)
+print(encoder.is_access_enabled(getattr(encoder, 'model_guid', None)))
 
-with open_dict(hparams):
-    del hparams['labels']
-    del hparams['joint']
-
-print(hparams)
-
-layer = encoder.layers[0]
-
-print(layer)
+cache_len = encoder.streaming_cfg.last_channel_cache_size
+cache_keep_size = max_audio_length - encoder.streaming_cfg.cache_drop_size
+max_audio_length = max_audio_length + cache_len
+padding_length = pre_encode_lens + cache_len

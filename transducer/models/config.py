@@ -78,6 +78,7 @@ class FastConformerConfig(EncoderConfig):
 
     num_heads: int = 8
     att_context_size: list = Field(default_factory=lambda: [-1, -1])
+    att_context_style: Literal["regular", "chunked_limited"] = "regular"
     pos_emb_max_len: int = 5000
 
     conv_kernel_size: StrictInt = 9
@@ -139,6 +140,18 @@ class ParakeetDecoderConfig(DecoderConfig):
     num_layers: StrictInt = 1
     dropout: StrictFloat = 0.2
     vocab_size: StrictInt = 1024
+
+
+class StreamingConfig(Args):
+    chunk_size:list = Field(default_factory=lambda: [9,16])
+    shift_size:list = Field(default_factory=lambda: [9,16])
+    cache_drop_size:int = 0
+    last_channel_cache_size:int = 70
+    valid_out_len:int = 2
+    pre_encode_cache_size:list = Field(default_factory = lambda: [0,9])
+    drop_extra_pre_encoded:int = 2
+    last_channel_num:int = 0
+    last_time_num:int = 0
 
 
 class ModelConfig(Args):

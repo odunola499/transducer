@@ -91,7 +91,7 @@ class ConvSubsampling(nn.Module):
         self.ceil_mode = False
         self._left_padding = kernel_size - 1
         self._right_padding = stride - 1
-        self._max_cache_len = 0
+        self._max_cache_len = config.subsampling_factor + 1
 
         layers.append(
             CausalConv2D(
