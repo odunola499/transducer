@@ -1,10 +1,8 @@
 import nemo.collections.asr as nemo_asr
 import torch
 
-from transducer.models.encoder.fast_conformer import (
-    ConformerEncoder,
-    FastConformerConfig,
-)
+from transducer.models.parakeet.config import FastConformerConfig
+from transducer.models.parakeet.encoder import ConformerEncoder
 
 
 def print_params(module: torch.nn.Module):
