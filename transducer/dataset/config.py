@@ -7,7 +7,7 @@ from transducer.config import Args
 
 class TokenizerConfig(Args):
     vocab_size: StrictInt = 1024
-    spe_tokenizer_path: Optional[StrictStr] = "../processor/lowercase_tokenizer.model"
+    spe_tokenizer_path: Optional[StrictStr] = "/home/ubuntu/transducer/transducer/models/dawn/lowercase_tokenizer.model"
     spe_model_prefix: StrictStr = "tokenizer"
     train_new_tokenizer: StrictBool = False
     tokenizer_dataset_path: Optional[StrictStr] = None
@@ -36,7 +36,7 @@ class DatasetConfig(Args):
     train_data: Union[HFDatasetStruct, JsonlDatasetStruct]
     val_data: Union[HFDatasetStruct, JsonlDatasetStruct]
     tokenizer_config: TokenizerConfig = TokenizerConfig()
-    feature_extractor_type: Literal["wav2vec2", "wav2vecbert"] = "wav2vec2"
+    feature_extractor_type: Literal["wav2vec2", "wav2vecbert", "parakeet"] = "wav2vec2"
     sample_rate: StrictInt = 16000
 
     min_audio_length_ms: Optional[StrictInt] = 100

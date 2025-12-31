@@ -1,21 +1,41 @@
-from transducer.models.base import BaseModel
-from transducer.models.config import (
-    DecoderConfig,
-    EncoderConfig,
-    ModelConfig,
-    Wav2Vec2BertConfig,
-    Wav2VecLargeConfig,
-    Wav2VecSmallConfig,
-)
-from transducer.models.dawn import DawnModel
-
 __all__ = [
     "BaseModel",
-    "DecoderConfig",
-    "EncoderConfig",
-    "ModelConfig",
+    "DawnDecoderConfig",
+    "DawnModel",
+    "DawnModelConfig",
+    "FastConformerConfig",
+    "Parakeet",
+    "ParakeetDecoderConfig",
+    "ParakeetModelConfig",
     "Wav2Vec2BertConfig",
     "Wav2VecLargeConfig",
     "Wav2VecSmallConfig",
-    "DawnModel",
 ]
+
+
+def __getattr__(name):
+    if name == "BaseModel":
+        from transducer.commons.modeling import BaseModel
+
+        return BaseModel
+    if name in {
+        "DawnDecoderConfig",
+        "DawnModel",
+        "DawnModelConfig",
+        "Wav2Vec2BertConfig",
+        "Wav2VecLargeConfig",
+        "Wav2VecSmallConfig",
+    }:
+        from transducer.models import dawn
+
+        return getattr(dawn, name)
+    if name in {
+        "FastConformerConfig",
+        "Parakeet",
+        "ParakeetDecoderConfig",
+        "ParakeetModelConfig",
+    }:
+        from transducer.models import parakeet
+
+        return getattr(parakeet, name)
+    raise AttributeError(name)

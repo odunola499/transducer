@@ -6,14 +6,14 @@ import librosa
 import numpy as np
 from torch import distributed as dist
 from torch.utils.data import Dataset, IterableDataset, get_worker_info
-from transformers import AutoFeatureExtractor
-
 from transducer.dataset.config import DatasetConfig
-from transducer.processor import Processor, Tokenizer, NemoFeatureExtractor
+from transducer.commons import Processor
+from transducer.models.dawn.feature_extractor import FEATURE_EXTRACTORS as DAWN_FEATURE_EXTRACTORS
+from transducer.models.dawn.tokenizer import Tokenizer
+from transducer.models.parakeet.feature_extractor import NemoFeatureExtractor
 
 FEATURE_EXTRACTORS = {
-    "wav2vec2": AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-base"),
-    "wav2vecbert": AutoFeatureExtractor.from_pretrained("facebook/w2v-bert-2.0"),
+    **DAWN_FEATURE_EXTRACTORS,
     "parakeet": NemoFeatureExtractor(),
 }
 

@@ -65,7 +65,7 @@ dataset:
     text_column_name: text
   tokenizer_config:
     vocab_size: 1024
-    spe_tokenizer_path: transducer/processor/lowercase_tokenizer.model
+    spe_tokenizer_path: transducer/models/dawn/lowercase_tokenizer.model
     spe_model_prefix: tokenizer
     train_new_tokenizer: false
     tokenizer_dataset_path: null

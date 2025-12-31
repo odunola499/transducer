@@ -1,10 +1,13 @@
 import math
+from typing import TYPE_CHECKING
 
 import torch
 from torch import Tensor, nn
 
-from transducer.models.config import FastConformerConfig
-from transducer.models.modules.convolution_module import CausalConv2D
+from transducer.models.modules.causal_convs import CausalConv2D
+
+if TYPE_CHECKING:
+    from transducer.models.parakeet.config import FastConformerConfig
 
 
 def calc_length(lengths, all_paddings, kernel_size, stride, ceil_mode, repeat_num=1):
@@ -67,7 +70,7 @@ class MaskedConvSequential(nn.Sequential):
 class ConvSubsampling(nn.Module):
     def __init__(
         self,
-        config: FastConformerConfig,
+        config: "FastConformerConfig",
         stride: int = 2,
         kernel_size: int = 3,
     ):

@@ -1,7 +1,7 @@
 import torch
-from models.encoder import wav2vec
 
-from transducer.models.config import Wav2VecSmallConfig
+from transducer.models.dawn import encoder_wav2vec as wav2vec
+from transducer.models.dawn.config import Wav2VecSmallConfig
 
 
 def _expected_conv_length(config: Wav2VecSmallConfig, input_length: int) -> int:

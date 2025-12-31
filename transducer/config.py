@@ -12,14 +12,7 @@ if TYPE_CHECKING:
     from transducer.train.config import TrainConfig
 
 
-class Args(BaseModel):
-    extra_kwargs: Dict[str, Any] = {}
-
-    def to_dict(self):
-        return self.model_dump()
-
-    def to_json(self):
-        return self.model_dump_json()
+from transducer.commons.config import Args
 
 
 def _ensure_forward_refs():
