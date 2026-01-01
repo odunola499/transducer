@@ -9,7 +9,7 @@ import os
 
 
 def main() -> int:
-    audio_path = "/home/ubuntu/transducer/fugitivepieces_02_pope_64kb.mp3"
+    audio_path = "/Users/odunolajenrola/Documents/GitHub/transducer/fugitivepieces_02_pope_64kb.mp3"
     audio, _sr = librosa.load(audio_path, sr=16000, mono=True)
     audio_tensor = torch.from_numpy(audio).unsqueeze(0)
 

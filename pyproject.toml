@@ -14,7 +14,6 @@ dependencies = [
   "datasets",
   "jiwer>=3.0.4",
   "numba>=0.63.1",
-  "pyyaml>=6.0.2",
   "rich>=13.9.4",
   "wandb>=0.16.0",
   "torch>=2.9.1",
