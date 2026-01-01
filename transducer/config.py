@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 import yaml
 from pydantic import BaseModel
@@ -12,15 +12,9 @@ if TYPE_CHECKING:
     from transducer.train.config import TrainConfig
 
 
-class Args(BaseModel):
-    extra_kwargs: Dict[str, Any] = {}
+from transducer.commons.config import Args
 
-    def to_dict(self):
-        return self.model_dump()
 
-    def to_json(self):
-        return self.model_dump_json()
-    
 def _ensure_forward_refs():
     from transducer.dataset.config import DatasetConfig
     from transducer.models.config import ModelConfig

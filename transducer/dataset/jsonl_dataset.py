@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 import numpy as np
 from torch.nn.utils.rnn import pad_sequence
@@ -75,7 +75,9 @@ class JsonlDataset(BaseDataset):
             features = features["input_values"]
         else:
             features = features.input_values
-        labels = pad_sequence(texts, batch_first=True, padding_value=self.processor.pad_id)
+        labels = pad_sequence(
+            texts, batch_first=True, padding_value=self.processor.pad_id
+        )
         label_lens = (labels != self.processor.pad_id).sum(dim=-1)
         return {
             "audio_features": features,

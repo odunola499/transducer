@@ -10,6 +10,7 @@ from transducer.kernels.gpu_kernels.gpu_tdt import GPUTDT
 from transducer.kernels.gpu_kernels.helpers import flatten_tensor, get_workspace_size
 from transducer.kernels.utils import RNNTStatus
 
+
 def tdt_loss_gpu(
     label_acts: torch.Tensor,
     duration_acts: torch.Tensor,
@@ -36,7 +37,9 @@ def tdt_loss_gpu(
     alphabet_size = label_acts.shape[3]
 
     if hasattr(cuda, "external_stream"):
-        stream = cuda.external_stream(torch.cuda.current_stream(label_acts.device).cuda_stream)
+        stream = cuda.external_stream(
+            torch.cuda.current_stream(label_acts.device).cuda_stream
+        )
 
     else:
         stream = cuda.default_stream()
@@ -49,7 +52,9 @@ def tdt_loss_gpu(
     gpu_size, status = get_workspace_size(maxT, maxU, minibatch_size, gpu=True)
 
     if status != RNNTStatus.RNNT_STATUS_SUCCESS:
-        raise RuntimeError("Invalid parameter passed when calculating working space memory")
+        raise RuntimeError(
+            "Invalid parameter passed when calculating working space memory"
+        )
 
     # Select GPU index
 
@@ -157,10 +162,14 @@ class _TDTNumba(Function):
             raise ValueError("TDT is not yet implemented for non CUDA computation.")
 
         label_grads = torch.zeros_like(label_acts) if label_acts.requires_grad else None
-        duration_grads = torch.zeros_like(duration_acts) if duration_acts.requires_grad else None
+        duration_grads = (
+            torch.zeros_like(duration_acts) if duration_acts.requires_grad else None
+        )
         minibatch_size = label_acts.size(0)
 
-        costs = torch.zeros(minibatch_size, device=label_acts.device, dtype=label_acts.dtype)
+        costs = torch.zeros(
+            minibatch_size, device=label_acts.device, dtype=label_acts.dtype
+        )
 
         loss_func(
             label_acts,
@@ -246,7 +255,9 @@ class TDTLoss(Loss):
         # Lazy, we take all frames as important for now.
         if act_lens is None:
             batch_size, num_frames = acts.shape[:2]
-            act_lens  = torch.tensor([num_frames]* batch_size, device=acts.device, dtype=torch.long)
+            act_lens = torch.tensor(
+                [num_frames] * batch_size, device=acts.device, dtype=torch.long
+            )
 
         label_acts, duration_acts = torch.split(
             acts, [acts.shape[-1] - len(self.durations), len(self.durations)], dim=-1
@@ -254,7 +265,9 @@ class TDTLoss(Loss):
 
         label_acts = label_acts.contiguous()
 
-        duration_acts = torch.nn.functional.log_softmax(duration_acts, dim=-1).contiguous()
+        duration_acts = torch.nn.functional.log_softmax(
+            duration_acts, dim=-1
+        ).contiguous()
 
         return self.loss(
             label_acts,
@@ -271,8 +284,8 @@ class TDTLoss(Loss):
             self.omega,
         )
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     torch.manual_seed(0)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -291,7 +304,7 @@ if __name__ == "__main__":
         blank_id=0,
         durations=durations,
         sigma=1.0,
-        omega=0.5, 
+        omega=0.5,
         reduction="mean",
     )
 

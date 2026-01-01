@@ -1,9 +1,12 @@
+import math
 from typing import Optional
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.nn.attention import SDPBackend
+
+INF_VAL = 10000.0
 
 
 def _flash_status(
@@ -17,7 +20,10 @@ def _flash_status(
     if not torch.backends.cuda.is_built():
         return False, "CUDA is not built with PyTorch; falling back to non-flash kernel"
     if attention_mask is not None:
-        return False, "attention mask provided; flash kernel will fall back to math implementation"
+        return (
+            False,
+            "attention mask provided; flash kernel will fall back to math implementation",
+        )
     if not torch.backends.cuda.sdp_kernel.is_flash_available(query, key, value):
         return False, "flash kernel not available for input dtype/shape; using fallback"
     return True, ""
@@ -29,7 +35,7 @@ def eager_attention_forward(
     key: torch.Tensor,
     value: torch.Tensor,
     attention_mask: Optional[torch.Tensor],
-    scaling: float,
+    scaling: Optional[float] = None,
     dropout: float = 0.0,
 ):
     attn_weights = torch.matmul(query, key.transpose(2, 3)) * scaling
@@ -51,7 +57,7 @@ def sdpa_attention_forward(
     key: torch.Tensor,
     value: torch.Tensor,
     attention_mask: Optional[torch.Tensor],
-    scaling: float,
+    scaling: Optional[float] = None,
     dropout: float = 0.0,
     **kwargs,
 ):
@@ -70,7 +76,6 @@ def flash_attention_forward(
     attention_mask: Optional[torch.Tensor],
     scaling: float,
     dropout: float = 0.0,
-    **kwargs,
 ):
     can_flash, reason = _flash_status(query, key, value)
     if not can_flash:
@@ -96,28 +101,167 @@ ATTN_FUNCTIONS = {
     "eager": eager_attention_forward,
 }
 
+
+class PositionalEncoding(nn.Module):
+    def __init__(
+        self,
+        hidden_size: int,
+        dropout=0.1,
+        max_len: int = 5000,
+        dropout_rate_emb: float = 0.0,
+        xscale: bool = False,
+    ):
+        super().__init__()
+        self.d_model = hidden_size
+        self.xscale = xscale
+        self.dropout = nn.Dropout(p=dropout)
+        self.max_len = max_len
+        self.dropout_emb = nn.Dropout(p=dropout_rate_emb)
+
+    def create_pe(self, positions):
+        pos_length = positions.size(0)
+        pe = torch.zeros(pos_length, self.d_model, device=positions.device)
+        div_term = torch.exp(
+            torch.arange(
+                0, self.d_model, 2, dtype=torch.float32, device=positions.device
+            )
+            * -(math.log(INF_VAL) / self.d_model)
+        )
+        pe[:, 0::2] = torch.sin(positions * div_term)
+        pe[:, 1::2] = torch.cos(positions * div_term)
+        pe = pe.unsqueeze(0).to(positions.device)
+        self.register_buffer("pe", pe, persistent=False)
+
+    def extend_pe(self, length, device):
+        needed_size = 2 * length - 1
+        if hasattr(self, "pe") and self.pe.size(1) >= needed_size:
+            return
+        positions = torch.arange(
+            length - 1, -length, -1, dtype=torch.float32, device=device
+        ).unsqueeze(1)
+        self.create_pe(positions=positions)
+
+    def forward(self, x: Tensor, cache_len=0):
+        if self.xscale:
+            x = x * self.xscale
+
+        input_len = x.size(1) + cache_len
+        center_pos = self.pe.size(1) // 2 + 1
+        start_pos = center_pos - input_len
+        end_pos = center_pos + input_len - 1
+        pos_emb = self.pe[:, start_pos:end_pos]
+        if self.dropout_emb:
+            pos_emb = self.dropout_emb(pos_emb)
+        return self.dropout(x), pos_emb
+
+
+class FastConformerAttention(nn.Module):
+    def __init__(
+        self,
+        num_heads,
+        hidden_size: int,
+        dropout: float,
+        use_bias: bool = True,
+        attn_impl="sdpa",
+    ):
+        super().__init__()
+        self.d_k = hidden_size // num_heads
+        self.s_d_k = math.sqrt(self.d_k)
+        self.num_heads = num_heads
+        self.dropout = dropout
+        self.linear_q = nn.Linear(hidden_size, hidden_size, bias=use_bias)
+        self.linear_k = nn.Linear(hidden_size, hidden_size, bias=use_bias)
+        self.linear_v = nn.Linear(hidden_size, hidden_size, bias=use_bias)
+        self.linear_out = nn.Linear(hidden_size, hidden_size, bias=use_bias)
+
+        self.linear_pos = nn.Linear(hidden_size, hidden_size, bias=use_bias)
+        self.pos_bias_u = nn.Parameter(torch.FloatTensor(self.num_heads, self.d_k))
+        self.pos_bias_v = nn.Parameter(torch.FloatTensor(self.num_heads, self.d_k))
+        self.attn_impl = attn_impl
+
+    def rel_shift(self, x: Tensor):
+        B, H, qlen, pos_len = x.size()
+        x = F.pad(x, pad=(1, 0))
+        x = x.view(B, H, -1, qlen)[:, :, 1:].view(B, H, qlen, pos_len)
+        return x
+
+    def forward(self, x: Tensor, pos_emb: Tensor, att_mask: Optional[Tensor] = None):
+        """
+        query (torch.Tensor): (batch, time1, size)
+            key (torch.Tensor): (batch, time2, size)
+            value(torch.Tensor): (batch, time2, size)
+            pos_emb (torch.Tensor) : (batch, time1, size)
+        """
+        B, T = x.shape[:2]
+
+        query = self.linear_q(x).view(B, -1, self.num_heads, self.d_k)
+        key = self.linear_k(x).view(B, -1, self.num_heads, self.d_k).transpose(1, 2)
+        value = self.linear_v(x).view(B, -1, self.num_heads, self.d_k).transpose(1, 2)
+        p = (
+            self.linear_pos(pos_emb)
+            .view(pos_emb.shape[0], -1, self.num_heads, self.d_k)
+            .transpose(1, 2)
+        )
+
+        n_batch = x.shape[0]
+
+        q_with_bias_u = (query + self.pos_bias_u).transpose(1, 2)
+        q_with_bias_v = (query + self.pos_bias_v).transpose(1, 2)
+
+        matrix_bd = torch.matmul(q_with_bias_v, p.transpose(-2, -1))
+        matrix_bd = self.rel_shift(matrix_bd)
+        matrix_bd = matrix_bd[:, :, :, : key.size(-2)]
+
+        if att_mask is not None:
+            if att_mask.dtype != torch.bool:
+                att_mask = att_mask.to(torch.bool)
+            if att_mask.dim() == 3:
+                att_mask = att_mask.unsqueeze(1)
+        mask_for_sdpa = att_mask
+
+        if self.attn_impl == "eager":
+            matrix_ac = torch.matmul(q_with_bias_u, key.transpose(-2, -1))
+            scores = (matrix_ac + matrix_bd) / self.s_d_k
+            if att_mask is not None:
+                scores = scores.masked_fill(att_mask, -INF_VAL)
+            attn = torch.softmax(scores, dim=-1)
+            if att_mask is not None:
+                attn = attn.masked_fill(att_mask, 0.0)
+            attn = F.dropout(attn, p=self.dropout, training=self.training)
+            output = torch.matmul(attn, value)
+            output = output.transpose(1, 2).contiguous()
+        else:
+            matrix_bd = matrix_bd * (1 / self.s_d_k)
+            if att_mask is not None:
+                matrix_bd = matrix_bd.masked_fill(att_mask, -INF_VAL)
+            output, _ = sdpa_attention_forward(
+                self,
+                query=q_with_bias_u,
+                key=key,
+                value=value,
+                attention_mask=matrix_bd,
+                scaling=None,
+                dropout=self.dropout if self.training else 0.0,
+            )
+            if mask_for_sdpa is not None:
+                all_masked_rows = torch.all(mask_for_sdpa, dim=-1)
+                if all_masked_rows.dim() == 3:
+                    all_masked_rows = all_masked_rows.squeeze(1)
+                output = output.masked_fill(
+                    all_masked_rows.unsqueeze(-1).unsqueeze(-1), 0.0
+                )
+
+        output = output.reshape(n_batch, -1, self.num_heads * self.d_k)
+        return self.linear_out(output)
+
+
 if __name__ == "__main__":
-    query = torch.randn(2, 6, 4, 8)
-    key = torch.randn(2, 6, 4, 8)
-    value = torch.randn(2, 6, 4, 8)
+    query = torch.randn(2, 6, 8)
+    pos = torch.randn(2, 6, 8)
 
-    batch_size = query.shape[0]
-    seq_len = query.shape[-2]
-    causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=query.device))[
-        None, None, :, :
-    ].expand(batch_size, 1, seq_len, seq_len)
-    causal_mask = (1.0 - causal_mask) * torch.finfo(torch.float).min
-
-    module = nn.Module()
-    module.num_key_value_groups = 1
-
-    output, _ = eager_attention_forward(
-        module, query, key, value, attention_mask=causal_mask, scaling=1
+    attn = FastConformerAttention(
+        num_heads=4,
+        hidden_size=8,
+        dropout=0.1,
     )
-    sdpa_output, _ = sdpa_attention_forward(
-        module, query, key, value, attention_mask=causal_mask, scaling=1
-    )
-    print(output.shape)
-    print(sdpa_output.shape)
-    result = torch.allclose(output, sdpa_output)
-    print(result)
+    print(attn(query, pos))

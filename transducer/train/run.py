@@ -7,7 +7,7 @@ import torch.distributed as dist
 from rich.console import Console
 
 from transducer.config import Config
-from transducer.dataset import StreamingHFDataset,HFDataset, JsonlDataset
+from transducer.dataset import HFDataset, JsonlDataset, StreamingHFDataset
 from transducer.dataset.config import DatasetConfig, HFDatasetStruct, JsonlDatasetStruct
 from transducer.models import DawnModel
 from transducer.train.train_module import TrainModule
@@ -25,30 +25,42 @@ def _init_distributed() -> Optional[int]:
     return local_rank
 
 
-def _build_dataloaders(config: DatasetConfig, train_batch_size: int, eval_batch_size: int):
+def _build_dataloaders(
+    config: DatasetConfig, train_batch_size: int, eval_batch_size: int
+):
     train_data = config.train_data
     val_data = config.val_data
     if config.dataset_type == "hf":
         if not isinstance(train_data, HFDatasetStruct):
-            raise ValueError("train_data must be HFDatasetStruct when dataset_type='hf'.")
+            raise ValueError(
+                "train_data must be HFDatasetStruct when dataset_type='hf'."
+            )
         if not isinstance(val_data, HFDatasetStruct):
             raise ValueError("val_data must be HFDatasetStruct when dataset_type='hf'.")
         train_dataset = HFDataset(train_data, config)
         val_dataset = HFDataset(val_data, config)
-    
-    elif config.dataset_type == 'stream_hf':
+
+    elif config.dataset_type == "stream_hf":
         if not isinstance(train_data, HFDatasetStruct):
-            raise ValueError("train_data must be HFDatasetStruct when dataset_type='stream_hf'.")
+            raise ValueError(
+                "train_data must be HFDatasetStruct when dataset_type='stream_hf'."
+            )
         if not isinstance(val_data, HFDatasetStruct):
-            raise ValueError("val_data must be HFDatasetStruct when dataset_type='stream_hf'.")
+            raise ValueError(
+                "val_data must be HFDatasetStruct when dataset_type='stream_hf'."
+            )
         train_dataset = StreamingHFDataset(train_data, config)
         val_dataset = StreamingHFDataset(val_data, config)
-        
+
     elif config.dataset_type == "jsonl":
         if not isinstance(train_data, JsonlDatasetStruct):
-            raise ValueError("train_data must be JsonlDatasetStruct when dataset_type='jsonl'.")
+            raise ValueError(
+                "train_data must be JsonlDatasetStruct when dataset_type='jsonl'."
+            )
         if not isinstance(val_data, JsonlDatasetStruct):
-            raise ValueError("val_data must be JsonlDatasetStruct when dataset_type='jsonl'.")
+            raise ValueError(
+                "val_data must be JsonlDatasetStruct when dataset_type='jsonl'."
+            )
         train_dataset = JsonlDataset(train_data, config)
         val_dataset = JsonlDataset(val_data, config)
     else:
@@ -74,7 +86,11 @@ def main() -> None:
     config = Config.from_yaml_file(args.config)
     local_rank = _init_distributed()
 
-    device = torch.device("cuda", local_rank) if torch.cuda.is_available() else torch.device("cpu")
+    device = (
+        torch.device("cuda", local_rank)
+        if torch.cuda.is_available()
+        else torch.device("cpu")
+    )
     console = Console()
 
     train_loader, val_loader, train_dataset = _build_dataloaders(

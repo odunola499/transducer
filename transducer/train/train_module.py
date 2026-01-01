@@ -1,11 +1,11 @@
 import math
-import os
-from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, List
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.distributed as dist
+import wandb
 from jiwer import wer
 from rich.console import Console
 from rich.progress import (
@@ -15,12 +15,11 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-import wandb
 from rich.table import Table
+from safetensors.torch import save_file
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
-from safetensors.torch import save_file
 
 from transducer.models import BaseModel
 from transducer.train.commons import OPTIMIZERS, SCHEDULERS
@@ -73,17 +72,25 @@ class TrainModule:
 
         self.model = model.to(self.device)
         if is_dist() and config.strategy == "ddp":
-            self.model = DDP(self.model, device_ids=[local_rank] if device.type == "cuda" else None)
-        self.raw_model = self.model.module if isinstance(self.model, DDP) else self.model
+            self.model = DDP(
+                self.model, device_ids=[local_rank] if device.type == "cuda" else None
+            )
+        self.raw_model = (
+            self.model.module if isinstance(self.model, DDP) else self.model
+        )
 
         self.train_loader = self._configure_loader(train_loader, shuffle=True)
         self.valid_loader = (
-            self._configure_loader(valid_loader, shuffle=False) if valid_loader is not None else None
+            self._configure_loader(valid_loader, shuffle=False)
+            if valid_loader is not None
+            else None
         )
 
         self.scaler = torch.cuda.amp.GradScaler(enabled=config.precision == "fp16")
         self.autocast_dtype = _autocast_dtype(config.precision)
-        self.autocast_enabled = self.autocast_dtype is not None and device.type == "cuda"
+        self.autocast_enabled = (
+            self.autocast_dtype is not None and device.type == "cuda"
+        )
 
         self.global_step = 0
         self.configure_optimizers()
@@ -163,11 +170,13 @@ class TrainModule:
             return
         self.wandb_run.log(metrics, step=self.global_step)
 
-    def _log_predictions_wandb(self, name: str, preds: list[str], targets: list[str]) -> None:
+    def _log_predictions_wandb(
+        self, name: str, preds: list[str], targets: list[str]
+    ) -> None:
         if self.wandb_run is None or not preds or not targets:
             return
         table = self.wandb.Table(columns=["pred", "target"])
-        for p, t in zip(preds, targets):
+        for p, t in zip(preds, targets, strict=False):
             table.add_data(p, t)
         self.wandb_run.log({name: table}, step=self.global_step)
 
@@ -182,9 +191,11 @@ class TrainModule:
                 moved[key] = value.to(self.device, non_blocking=True)
             else:
                 moved[key] = value
-        return moved  
+        return moved
 
-    def _decode_texts(self, labels: torch.Tensor, label_lens: torch.Tensor) -> list[str]:
+    def _decode_texts(
+        self, labels: torch.Tensor, label_lens: torch.Tensor
+    ) -> list[str]:
         tokenizer = self.raw_model.get_tokenizer()
         texts = []
         for i in range(labels.size(0)):
@@ -210,7 +221,7 @@ class TrainModule:
         table = Table(title="Sample Predictions")
         table.add_column("Pred")
         table.add_column("Target")
-        for pred, tgt in zip(preds, targets):
+        for pred, tgt in zip(preds, targets, strict=False):
             table.add_row(pred, tgt)
         self.console.print(table)
 
@@ -268,7 +279,9 @@ class TrainModule:
                     show_preds = preds[: self.config.max_print_predictions]
                     show_targets = targets[: self.config.max_print_predictions]
                     self._print_predictions(show_preds, show_targets)
-                    self._log_predictions_wandb("val/predictions", show_preds, show_targets)
+                    self._log_predictions_wandb(
+                        "val/predictions", show_preds, show_targets
+                    )
                 num_batches += 1
 
                 if max_batches and num_batches >= max_batches:
@@ -312,9 +325,11 @@ class TrainModule:
         if self.valid_loader is not None and self.config.num_sanity_val_steps:
             metrics = self._validate(max_batches=self.config.num_sanity_val_steps)
             if self.rank == 0 and metrics:
-                self.console.print(
-                    f"sanity_val_loss={metrics['val_loss']:.4f} sanity_val_wer={metrics['val_wer']:.4f}"
+                message = (
+                    f"sanity_val_loss={metrics['val_loss']:.4f} "
+                    f"sanity_val_wer={metrics['val_wer']:.4f}"
                 )
+                self.console.print(message)
             if metrics:
                 self._log_metrics(
                     {
@@ -393,21 +408,26 @@ class TrainModule:
                         self._log_metrics(
                             {
                                 f"train/loss_rank_{self.rank}": loss.item() * acc_steps,
-                                f"train/lr_rank_{self.rank}": self.optimizer.param_groups[0]["lr"],
+                                f"train/lr_rank_{self.rank}": self.optimizer.param_groups[
+                                    0
+                                ]["lr"],
                             }
                         )
 
                     if (
                         self.config.log_indices
                         and batch_indices is not None
-                        and self.global_step % self.config.log_indices_every_num_steps == 0
+                        and self.global_step % self.config.log_indices_every_num_steps
+                        == 0
                     ):
                         indices = batch_indices[: self.config.max_log_indices]
                         self._log_metrics({f"train/indices_rank_{self.rank}": indices})
 
                     if (
                         self.config.print_predictions
-                        and self.global_step % self.config.print_predictions_every_num_steps == 0
+                        and self.global_step
+                        % self.config.print_predictions_every_num_steps
+                        == 0
                         and self.rank == 0
                     ):
                         preds = self._predict_texts(for_forward_pass["audio_features"])
@@ -420,7 +440,8 @@ class TrainModule:
                     if (
                         self.valid_loader is not None
                         and self.config.check_val_every_num_steps
-                        and self.global_step % self.config.check_val_every_num_steps == 0
+                        and self.global_step % self.config.check_val_every_num_steps
+                        == 0
                     ):
                         metrics = self._validate()
                         if metrics:
@@ -432,16 +453,30 @@ class TrainModule:
                             )
                             self._maybe_checkpoint(metrics)
                         if self.rank == 0 and metrics:
-                            loss_key = "val_loss_global" if "val_loss_global" in metrics else "val_loss"
-                            wer_key = "val_wer_global" if "val_wer_global" in metrics else "val_wer"
-                            self.console.print(
-                                f"{loss_key}={metrics[loss_key]:.4f} {wer_key}={metrics[wer_key]:.4f}"
+                            loss_key = (
+                                "val_loss_global"
+                                if "val_loss_global" in metrics
+                                else "val_loss"
                             )
+                            wer_key = (
+                                "val_wer_global"
+                                if "val_wer_global" in metrics
+                                else "val_wer"
+                            )
+                            message = (
+                                f"{loss_key}={metrics[loss_key]:.4f} "
+                                f"{wer_key}={metrics[wer_key]:.4f}"
+                            )
+                            self.console.print(message)
                             if loss_key != "val_loss" or wer_key != "val_wer":
                                 self._log_metrics(
                                     {
-                                        "val/loss_global": metrics.get("val_loss_global", metrics["val_loss"]),
-                                        "val/wer_global": metrics.get("val_wer_global", metrics["val_wer"]),
+                                        "val/loss_global": metrics.get(
+                                            "val_loss_global", metrics["val_loss"]
+                                        ),
+                                        "val/wer_global": metrics.get(
+                                            "val_wer_global", metrics["val_wer"]
+                                        ),
                                     }
                                 )
 
@@ -481,8 +516,10 @@ class TrainModule:
             return True
         if len(self.best_checkpoints) < self.save_top_k:
             return True
-        worst = max(self.best_checkpoints, key=lambda x: x[0]) if self.monitor_mode_min else min(
-            self.best_checkpoints, key=lambda x: x[0]
+        worst = (
+            max(self.best_checkpoints, key=lambda x: x[0])
+            if self.monitor_mode_min
+            else min(self.best_checkpoints, key=lambda x: x[0])
         )
         if self.monitor_mode_min:
             return monitor_value < worst[0]
@@ -511,7 +548,9 @@ class TrainModule:
 
         self.best_checkpoints.append((monitor_value, path))
         if len(self.best_checkpoints) > self.save_top_k:
-            self.best_checkpoints.sort(key=lambda x: x[0], reverse=not self.monitor_mode_min)
+            self.best_checkpoints.sort(
+                key=lambda x: x[0], reverse=not self.monitor_mode_min
+            )
             while len(self.best_checkpoints) > self.save_top_k:
                 _, remove_path = self.best_checkpoints.pop(-1)
                 try:

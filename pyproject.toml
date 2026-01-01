@@ -14,7 +14,6 @@ dependencies = [
   "datasets",
   "jiwer>=3.0.4",
   "numba>=0.63.1",
-  "pyyaml>=6.0.2",
   "rich>=13.9.4",
   "wandb>=0.16.0",
   "torch>=2.9.1",
@@ -25,7 +24,7 @@ dependencies = [
   "kernels>=0.11.5",
   "librosa>=0.11.0",
   "pyyaml>=6.0.3",
-  "triton"
+  #"triton"
 ]
 
 [project.optional-dependencies]
@@ -39,16 +38,13 @@ dev = [
 packages = ["transducer"]
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F"]
+ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-
-[tool.isort]
-profile = "black"
-line_length = 100

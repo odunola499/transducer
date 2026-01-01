@@ -39,7 +39,9 @@ def rnnt_loss_cpu(
     num_threads = max(1, num_threads)
     gpu_size, status = get_workspace_size(maxT, maxU, minibatch_size, gpu=False)
     if status != RNNTStatus.RNNT_STATUS_SUCCESS:
-        raise RuntimeError("Invalid parameter passed when calculating working space memory")
+        raise RuntimeError(
+            "Invalid parameter passed when calculating working space memory"
+        )
 
     cpu_workspace = torch.zeros(
         gpu_size, device=log_probs.device, dtype=log_probs.dtype, requires_grad=False
@@ -128,7 +130,9 @@ def rnnt_loss_gpu(
     alphabet_size = acts.shape[3]
 
     if hasattr(cuda, "external_stream"):
-        stream = cuda.external_stream(torch.cuda.current_stream(acts.device).cuda_stream)
+        stream = cuda.external_stream(
+            torch.cuda.current_stream(acts.device).cuda_stream
+        )
     else:
         stream = cuda.default_stream()
 
@@ -139,7 +143,9 @@ def rnnt_loss_gpu(
 
     gpu_size, status = get_workspace_size(maxT, maxU, minibatch_size, gpu=True)
     if status != RNNTStatus.RNNT_STATUS_SUCCESS:
-        raise RuntimeError("Invalid parameter passed when calculating working space memory")
+        raise RuntimeError(
+            "Invalid parameter passed when calculating working space memory"
+        )
 
     # Select GPU index
     cuda.select_device(acts.device.index)
@@ -197,7 +203,17 @@ def rnnt_loss_gpu(
 
 class _RNNTNumba(Function):
     @staticmethod
-    def forward(ctx, acts, labels, act_lens, label_lens, blank, reduction, fastemit_lambda, clamp):
+    def forward(
+        ctx,
+        acts,
+        labels,
+        act_lens,
+        label_lens,
+        blank,
+        reduction,
+        fastemit_lambda,
+        clamp,
+    ):
         """
         acts: Tensor of (batch x seqLength x labelLength x outputDim) containing output from network
         labels: 2 dimensional Tensor containing all the targets of the batch with zero padded
@@ -265,11 +281,15 @@ class RNNTLoss(Loss):
         self.reduction = reduction
         self.loss = _RNNTNumba.apply
 
-    def forward(self, acts: Tensor, labels: Tensor, label_lens, act_lens: Tensor = None):
+    def forward(
+        self, acts: Tensor, labels: Tensor, label_lens, act_lens: Tensor = None
+    ):
         # Lazy, we take all frames as important for now.
         if act_lens is None:
             batch_size, num_frames = acts.shape[:2]
-            act_lens  = torch.tensor([num_frames]* batch_size, device=acts.device, dtype=torch.long)
+            act_lens = torch.tensor(
+                [num_frames] * batch_size, device=acts.device, dtype=torch.long
+            )
         if not acts.is_cuda:
             if acts.dtype == torch.float16:
                 acts = acts.float()
@@ -290,7 +310,7 @@ class RNNTLoss(Loss):
 
 
 if __name__ == "__main__":
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     loss_func = RNNTLoss(blank_id=0)
     B, T, U, vocab_size = 4, 10, 7, 16
     lattice = torch.randn(B, T, U, vocab_size).to(device)
